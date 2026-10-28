@@ -86,7 +86,7 @@ func setup_enemy(name: String, enemy: Enemy) -> void:
 			enemy.def = 12.0
 			enemy.mag = 1.0
 		"skeleton":
-			enemy.name = "Skeleton"
+			enemy.name = "Skeleton3D"
 			enemy.hp = 40
 			enemy.max_hp = 40
 			enemy.atk = 9.0

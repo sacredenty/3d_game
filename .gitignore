@@ -1,0 +1,25 @@
+# Godot project cache
+.godot/
+
+# User data and saves
+user://
+*.pid
+
+# Editor settings (optional - can be shared)
+.vscode/
+
+# Build/export files
+*.exe
+*.pck
+.tscn.user_data.json
+.tres.user_data.json
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db

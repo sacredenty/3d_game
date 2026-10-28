@@ -31,7 +31,7 @@ var zones: Dictionary = {
 	"castle": {
 		"name": "Castle Ruins",
 		"description": "The crumbling remains of an ancient castle.",
-		"enemies": ["Skeleton", "Dark Mage", "Dragon"],
+		"enemies": ["Skeleton3D", "Dark Mage", "Dragon"],
 		"items": ["Sword", "Magic Scroll"],
 		"npcs": []
 	}
