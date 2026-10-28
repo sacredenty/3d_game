@@ -1,0 +1,13 @@
+name = "Chrono Chronicles"
+config_version = 4
+display_name = "Chrono Chronicles - FF6 Style RPG"
+
+application_config/
+icon = "res://assets/ui/icon.svg"
+
+rendering/
+renderer/rendering_method = "gl_compatibility"
+
+autoloads/Main= "res://scripts/main/main.gd"
+autoloads/ZoneManager= "res://scripts/systems/overworld/zone_manager.gd"
+autoloads/EncounterSystem= "res://scripts/systems/overworld/encounter_system.gd"
