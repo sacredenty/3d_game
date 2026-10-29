@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="res://scenes/autoloads/zone_manager.tscn"]
+
+[ext_resource type="Script" path="res://scripts/systems/overworld/zone_manager.gd" id="1_def"]
+
+[node name="ZoneManager" type="Node"]
+script = ExtResource("1_def")

@@ -4,13 +4,17 @@ class_name BattleScene
 
 @onready var game_manager: GameManager = null
 @onready var combat_system: CombatSystem = null
+@onready var encounter_system: EncounterSystem = null
 
 var player_chars: Array[Character] = []
 var enemy_chars: Array[Enemy] = []
 var is_player_turn: bool = true
 
 func _ready() -> void:
-	game_manager = GameManager.get_instance() if GameManager.has_instance() else null
+	game_manager = GameManager
+	
+	if EncounterSystem != null:
+		encounter_system = EncounterSystem
 	
 	# Connect signals
 	combat_system.turn_changed.connect(_on_turn_changed)

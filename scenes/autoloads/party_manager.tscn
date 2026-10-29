@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="res://scenes/autoloads/party_manager.tscn"]
+
+[ext_resource type="Script" path="res://scripts/core/party_manager.gd" id="1_pmc"]
+
+[node name="PartyManager" type="Node"]
+script = ExtResource("1_pmc")

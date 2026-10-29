@@ -4,10 +4,12 @@ class_name SaveManager
 
 const SAVE_FILE_PATH = "user://savegame.json"
 
+@onready var party_manager: PartyManager = null
+
 var current_save: Dictionary = {}
 
 func save_game() -> Error:
-	var party_data = PartyManager.get_instance().to_dict() if PartyManager.has_instance() else null
+	var party_data = party_manager.to_dict() if party_manager != null else null
 	
 	current_save = {
 		"timestamp": Time.get_ticks_datetime(),
@@ -40,8 +42,8 @@ func load_game() -> Error:
 	current_save = data
 	
 	# Load party
-	if "party" in current_save and PartyManager.has_instance():
-		PartyManager.get_instance().from_dict(current_save["party"])
+	if "party" in current_save and party_manager != null:
+		party_manager.from_dict(current_save["party"])
 	
 	return OK
 

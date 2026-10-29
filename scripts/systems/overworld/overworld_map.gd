@@ -16,14 +16,64 @@ var player_position: Vector2i = Vector2i(15, 10)
 signal player_moved(new_position: Vector2i)
 signal zone_entered(zone_name: String)
 
+@onready var tile_container: Control = $TileContainer if $TileContainer else null
+@onready var player_rect: ColorRect = $PlayerRect if $PlayerRect else null
+@onready var camera: Camera2D = get_parent().get_node_or_null("Camera2D")
+
 func _ready() -> void:
 	generate_default_map()
+	_setup_visuals()
+
+func _setup_visuals() -> void:
+	if tile_container == null or player_rect == null:
+		return
+	
+	tile_container.visible = true
+	player_rect.visible = true
+	
+	# Create tiles for rendering
+	for tile_type in TileType.values():
+		var positions = get_tiles_of_type(tile_type)
+		clear_tile_layer(tile_type)
+		
+		for pos in positions:
+			create_tile_visual(tile_type, Vector2i(pos.x, pos.y))
+
+func create_tile_visual(tile_type: TileType, position: Vector2i) -> void:
+	if tile_container == null or player_rect == null:
+		return
+	
+	var color = get_tile_color(tile_type)
+	var rect = ColorRect.new()
+	rect.size = Vector2(tile_size, tile_size)
+	rect.color = color
+	rect.position = Vector2(position.x * tile_size, position.y * tile_size)
+	
+	tile_container.add_child(rect)
+
+func clear_tile_layer(tile_type: TileType) -> void:
+	if tile_container == null or player_rect == null:
+		return
+	
+	for child in tile_container.get_children():
+		if child is ColorRect and child.color == get_tile_color(tile_type):
+			child.queue_free()
+
+func get_tile_color(tile_type: TileType) -> Color:
+	match tile_type:
+		TileType.GRASS: return Color(0.35, 0.7, 0.25)
+		TileType.WATER: return Color(0.2, 0.4, 0.6)
+		TileType.TREE: return Color(0.15, 0.5, 0.1)
+		TileType.MOUNTAIN: return Color(0.3, 0.3, 0.4)
+		TileType.PATH: return Color(0.6, 0.5, 0.35)
+		TileType.HOUSE: return Color(0.7, 0.5, 0.3)
+		TileType.NPC: return Color(1.0, 0.8, 0.2)
+		TileType.ITEM: return Color(1.0, 0.5, 0.5)
+	return Color(0.35, 0.7, 0.25)
 
 func generate_default_map() -> void:
-	# Clear existing tiles
 	tiles.clear()
 	
-	# Generate grass terrain
 	for x in range(map_width):
 		for y in range(map_height):
 			if is_walkable(x, y):
@@ -58,22 +108,26 @@ func move_player(dx: int, dy: int) -> bool:
 	player_position.x = new_x
 	player_position.y = new_y
 	
+	update_player_visual()
 	player_moved.emit(player_position)
-	
-	# Check for zone transitions
 	check_zone_transition()
 	
 	return true
 
+func update_player_visual() -> void:
+	if player_rect == null or player_rect.texture == null:
+		return
+	
+	var sprite_pos = Vector2i(player_position.x, player_position.y) * tile_size + Vector2(tile_size / 2, tile_size / 2)
+	player_rect.position = sprite_pos
+
 func check_zone_transition() -> void:
-	# Simple zone detection based on map regions
 	var current_zone = get_current_zone()
 	
 	if current_zone != "village":
 		zone_entered.emit(current_zone)
 
 func get_current_zone() -> String:
-	# Define zones by map coordinates
 	if player_position.x < 10 and player_position.y > 5:
 		return "village"
 	elif player_position.x > 20 or player_position.y < 8:

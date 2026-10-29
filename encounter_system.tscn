@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="res://scenes/autoloads/encounter_system.tscn"]
+
+[ext_resource type="Script" path="res://scripts/systems/overworld/encounter_system.gd" id="1_ghi"]
+
+[node name="EncounterSystem" type="Node"]
+script = ExtResource("1_ghi")

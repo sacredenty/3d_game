@@ -8,23 +8,21 @@
 
 config_version=5
 
-name="Chrono Chronicles"
-display_name="Chrono Chronicles - FF6 Style RPG"
-
 [application]
 
 run/main_scene="res://scenes/main/main_scene.tscn"
 config/features=PackedStringArray("4.3")
-
-[application_config]
-
-icon="res://assets/ui/icon.svg"
+name="Chrono Chronicles"
+display_name="Chrono Chronicles - FF6 Style RPG"
 
 [autoloads]
 
-Main="res://scripts/main/main.gd"
-ZoneManager="res://scripts/systems/overworld/zone_manager.gd"
-EncounterSystem="res://scripts/systems/overworld/encounter_system.gd"
+GameManager="res://scenes/autoloads/game_manager.tscn"
+CombatSystem="res://scenes/autoloads/combat_system.tscn"
+PartyManager="res://scenes/autoloads/party_manager.tscn"
+SaveManager="res://scenes/autoloads/save_manager.tscn"
+ZoneManager="res://scenes/autoloads/zone_manager.tscn"
+EncounterSystem="res://scenes/autoloads/encounter_system.tscn"
 
 [rendering]
 

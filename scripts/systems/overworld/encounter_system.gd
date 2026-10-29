@@ -4,18 +4,15 @@ class_name EncounterSystem
 
 const ENCOUNTER_CHANCE = 0.15  # 15% chance per step
 
-@onready var zone_manager: ZoneManager = null
+# ZoneManager is autoload, use directly
 
 signal encounter_started()
 signal encounter_ended(won: bool)
 
 var current_encounter: Array[Enemy] = []
 
-func _ready() -> void:
-	zone_manager = ZoneManager.get_instance() if ZoneManager.has_instance() else null
-
 func trigger_random_encounter() -> bool:
-	if randf() < ENCOUNTER_CHANCE and zone_manager:
+	if randf() < ENCOUNTER_CHANCE and ZoneManager:
 		var enemies = get_random_enemies()
 		if not enemies.is_empty():
 			current_encounter = enemies
@@ -24,9 +21,9 @@ func trigger_random_encounter() -> bool:
 	return false
 
 func get_random_enemies(count: int = 1) -> Array[Enemy]:
-	var enemy_names = zone_manager.get_zone_enemies()
+	var enemy_names = ZoneManager.get_zone_enemies()
 	
-	enemies.clear()
+	current_encounter.clear()
 	for i in range(min(count, enemy_names.size())):
 		var enemy_name = enemy_names[randi() % enemy_names.size()]
 		enemies.append(Enemy.new())

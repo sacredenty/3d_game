@@ -15,13 +15,9 @@ var current_zone: String = "village"
 var is_game_running: bool = false
 
 func _ready() -> void:
-	party_manager = PartyManager.new()
-	combat_system = CombatSystem.new()
-	save_manager = SaveManager.new()
-	
-	add_child(party_manager)
-	add_child(combat_system)
-	add_child(save_manager)
+	party_manager = PartyManager
+	combat_system = CombatSystem
+	save_manager = SaveManager
 	
 	# Try to load existing save
 	var err = save_manager.load_game()

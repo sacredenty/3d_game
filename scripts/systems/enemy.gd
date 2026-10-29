@@ -5,7 +5,7 @@ class_name Enemy extends Character
 enum AIBehavior { AGGRESSIVE, DEFENSIVE, BALANCED }
 
 @export_group("AI Behavior")
-var ai_behavior: AIBehavior = AIBALANCED
+var ai_behavior: AIBehavior = AIBehavior.BALANCED
 var attack_patterns: Array[Dictionary] = []
 
 # Loot table (item -> probability)

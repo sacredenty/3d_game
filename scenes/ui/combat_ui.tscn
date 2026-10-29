@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://combatui001"]
+
+[ext_resource type="Script" path="res://scripts/ui/combat_ui.gd" id="1::combat_ui"]
+
+[node name="CombatUI" type="Control"]
+script = ExtResource("1::combat_ui")
