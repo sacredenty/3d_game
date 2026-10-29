@@ -8,10 +8,14 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 run/main_scene="res://scenes/main/main_scene.tscn"
-config/features=PackedStringArray("4.3")
+config/features=PackedStringArray("4.7")
 name="Chrono Chronicles"
 display_name="Chrono Chronicles - FF6 Style RPG"
 
@@ -23,6 +27,13 @@ PartyManager="res://scenes/autoloads/party_manager.tscn"
 SaveManager="res://scenes/autoloads/save_manager.tscn"
 ZoneManager="res://scenes/autoloads/zone_manager.tscn"
 EncounterSystem="res://scenes/autoloads/encounter_system.tscn"
+
+[input]
+
+move_right/events=PackedStringArray("Key: Right Arrow")
+move_left/events=PackedStringArray("Key: Left Arrow")
+move_up/events=PackedStringArray("Key: Up Arrow", "Key: W")
+move_down/events=PackedStringArray("Key: Down Arrow", "Key: S")
 
 [rendering]
 

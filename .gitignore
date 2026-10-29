@@ -23,3 +23,16 @@ user://
 # OS generated files
 .DS_Store
 Thumbs.db
+.kilo/kilo.jsonc
+
+# Generated assets (placeholder pixel art)
+assets/**/*.png
+
+# Temporary and build artifacts
+*.tmp
+*.bak
+*.log
+
+# Unused addons (not referenced in project)
+addons/godot_ai/
+addons/godot_omni/

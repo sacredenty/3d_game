@@ -1,0 +1,47 @@
+[gd_scene load_steps=2 format=3 uid="uid://boss001"]
+
+[node name="BossScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="Label" parent="."]
+text = "BOSS BATTLE!"
+horizontal_alignment = 1
+vertical_alignment = 1
+font_size = 48
+
+[node name="BossInfoPanel" type="PanelContainer" parent="."]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 0.2
+anchor_right = 0.5
+offset_left = -250.0
+offset_top = 100.0
+offset_right = 250.0
+
+[node name="Label" type="Label" parent="BossInfoPanel"]
+text = "BOSS HP"
+horizontal_alignment = 1
+vertical_alignment = 1
+font_size = 24
+
+[node name="ProgressBar" type="ProgressBar" parent="BossInfoPanel"]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 0.0
+anchor_right = 0.5
+offset_left = -180.0
+offset_top = 25.0
+offset_right = 180.0
+
+[node name="BossName" type="Label" parent="."]
+text = "Dragon Lord"
+horizontal_alignment = 1
+vertical_alignment = 1
+font_size = 36

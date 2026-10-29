@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://test_assets"]
+
+[node name="AssetTest" type="Control"]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = -150.0
+
+[node name="Label" type="Label" parent="."]
+text = "Assets Loaded Successfully!"
+position = Vector2(0, 10)
+size = Vector2(400, 300)

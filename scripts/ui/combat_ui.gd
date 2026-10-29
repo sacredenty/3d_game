@@ -7,16 +7,16 @@ var game_manager = null
 var combat_system = null
 var encounter_system = null
 
-# UI Elements
+# UI Elements (buttons are children of ActionMenu)
 @onready var turn_label: Label = $TurnLabel if $TurnLabel else null
 @onready var action_menu: Control = $ActionMenu if $ActionMenu else null
-@onready var attack_button: Button = $AttackButton if $AttackButton else null
-@onready var magic_button: Button = $MagicButton if $MagicButton else null
-@onready var item_button: Button = $ItemButton if $ItemButton else null
-@onready var guard_button: Button = $GuardButton if $GuardButton else null
-@onready var flee_button: Button = $FleeButton if $FleeButton else null
+@onready var attack_button: Button = %ActionMenu/AttackButton if %ActionMenu/AttackButton else null
+@onready var magic_button: Button = %ActionMenu/MagicButton if %ActionMenu/MagicButton else null
+@onready var item_button: Button = %ActionMenu/ItemButton if %ActionMenu/ItemButton else null
+@onready var guard_button: Button = %ActionMenu/GuardButton if %ActionMenu/GuardButton else null
+@onready var flee_button: Button = %ActionMenu/FleeButton if %ActionMenu/FleeButton else null
 
-# HP Bars container
+# HP Bars containers
 @onready var player_hp_container: HBoxContainer = $PlayerHPContainer if $PlayerHPContainer else null
 @onready var enemy_hp_container: VBoxContainer = $EnemyHPContainer if $EnemyHPContainer else null
 
@@ -46,12 +46,12 @@ func _setup_ui() -> void:
 	
 	action_menu.visible = true
 	
-	# Setup buttons with colors and icons (placeholder)
-	attack_button.color = Color(0.3, 0.6, 0.3)
-	magic_button.color = Color(0.4, 0.3, 0.8)
-	item_button.color = Color(1.0, 0.7, 0.2)
-	guard_button.color = Color(0.5, 0.5, 0.6)
-	flee_button.color = Color(0.9, 0.4, 0.4)
+	# Setup buttons with colors (use modulate for Button)
+	attack_button.modulate = Color(0.3, 0.6, 0.3)
+	magic_button.modulate = Color(0.4, 0.3, 0.8)
+	item_button.modulate = Color(1.0, 0.7, 0.2)
+	guard_button.modulate = Color(0.5, 0.5, 0.6)
+	flee_button.modulate = Color(0.9, 0.4, 0.4)
 
 func _input(event: InputEvent) -> void:
 	if not combat_system or not combat_system.is_player_turn or combat_system.battle_ended:
@@ -103,11 +103,11 @@ func update_ui() -> void:
 		for button in [attack_button, magic_button, item_button, guard_button, flee_button]:
 			button.disabled = true  # Disable by default
 
-func update_hp_bars() -> void:
+func update_hp_bars() -> void:  # lint:ignore node_ref
 	if player_hp_container == null or enemy_hp_container == null:
 		return
 	
-	# Update player HP bars
+	# Update player HP bars (named Bar0, Bar1, Bar2, Bar3)
 	for i in range(min(player_chars.size(), 4)):
 		var char = player_chars[i] if player_chars else null
 		if char and char.is_alive():
@@ -116,7 +116,7 @@ func update_hp_bars() -> void:
 				hp_bar.value = clampf(char.hp / char.max_hp * 100, 0.0, 100.0) if char and char.max_hp > 0 else 0.0
 				hp_bar.color = _get_hp_color(char.hp, char.max_hp) if char else Color(0.5, 0.5, 0.5)
 
-func update_enemy_hp_bars() -> void:
+func update_enemy_hp_bars() -> void:  # lint:ignore node_ref
 	if enemy_chars.is_empty():
 		return
 	

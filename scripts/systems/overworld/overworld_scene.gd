@@ -15,14 +15,14 @@ func _ready() -> void:
 	overworld_map.zone_entered.connect(_on_zone_entered)
 
 func _process(delta: float) -> void:
-	# Handle keyboard input for movement
-	if Input.is_action_pressed("move_right"):
+	# Handle keyboard input for movement (using built-in ui_* actions)
+	if Input.is_action_pressed("ui_right"):
 		overworld_map.move_player(1, 0)
-	elif Input.is_action_pressed("move_left"):
+	elif Input.is_action_pressed("ui_left"):
 		overworld_map.move_player(-1, 0)
-	elif Input.is_action_pressed("move_up"):
+	elif Input.is_action_pressed("ui_up"):
 		overworld_map.move_player(0, -1)
-	elif Input.is_action_pressed("move_down"):
+	elif Input.is_action_pressed("ui_down"):
 		overworld_map.move_player(0, 1)
 
 func _on_player_moved(new_position: Vector2i) -> void:

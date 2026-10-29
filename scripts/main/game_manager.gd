@@ -2,78 +2,61 @@ extends Node
 
 class_name GameManager
 
-@onready var party_manager: PartyManager = null
-@onready var combat_system: CombatSystem = null
-@onready var save_manager: SaveManager = null
+signal zone_changed(old_zone: String, new_zone: String)
+signal party_member_joined(member_name: String)
+signal party_member_left(member_name: String)
 
-signal game_started()
-signal battle_started()
-signal battle_ended(winner: String)
-signal zone_changed(new_zone: String)
-
-var current_zone: String = "village"
-var is_game_running: bool = false
+var current_zone: String = "forest"
+var zones_data: Dictionary = {}
+var party_members: Array[Dictionary] = []
+var is_in_combat: bool = false
 
 func _ready() -> void:
-	party_manager = PartyManager
-	combat_system = CombatSystem
-	save_manager = SaveManager
-	
-	# Try to load existing save
-	var err = save_manager.load_game()
-	if err == OK:
-		print("Game loaded from save")
+	# Initialize default zones
+	zones_data["forest"] = {
+		"name": "Forest",
+		"description": "A dense woodland filled with ancient trees and mysterious creatures.",
+		"difficulty": 1,
+		"encounter_rate": 0.2
+	}
+	zones_data["dungeon"] = {
+		"name": "Dungeon",
+		"description": "Dark underground corridors teeming with dangerous monsters.",
+		"difficulty": 3,
+		"encounter_rate": 0.4
+	}
+	zones_data["castle"] = {
+		"name": "Castle Ruins",
+		"description": "Remains of an ancient fortress, now home to powerful enemies.",
+		"difficulty": 5,
+		"encounter_rate": 0.6
+	}
 
-func start_new_game() -> void:
-	is_game_running = true
-	
-	# Create default party
-	create_default_party()
-	
-	game_started.emit()
+func get_party_members() -> Array[Dictionary]:
+	return party_members
 
-func create_default_party() -> void:
-	var warrior = Character.new()
-	warrior.name = "Warrior"
-	warrior.atk = 15.0
-	warrior.def = 8.0
-	warrior.hp = 120
-	party_manager.add_character(warrior)
-	
-	var mage = Character.new()
-	mage.name = "Mage"
-	mage.mag = 12.0
-	mage.mp = 60
-	mage.hp = 70
-	party_manager.add_character(mage)
-	
-	var thief = Character.new()
-	thief.name = "Thief"
-	thief.atk = 12.0
-	thief.def = 5.0
-	thief.mag = 8.0
-	thief.hp = 65
-	party_manager.add_character(thief)
-	
-	var monk = Character.new()
-	monk.name = "Monk"
-	monk.atk = 14.0
-	monk.def = 7.0
-	monk.mp = 30
-	monk.hp = 90
-	party_manager.add_character(monk)
+func add_member(member_data: Dictionary) -> void:
+	if member_data not in party_members:
+		party_members.append(member_data)
+		party_member_joined.emit(member_data.get("name", "Unknown"))
 
-func start_battle(player_chars: Array[Character], enemy_chars: Array[Enemy]) -> void:
-	combat_system.start_battle(player_chars, enemy_chars)
-	battle_started.emit()
+func remove_member(member_name: String) -> void:
+	for i in range(party_members.size()):
+		if party_members[i].get("name") == member_name:
+			party_members.remove_at(i)
+			party_member_left.emit(member_name)
+			break
 
-func end_battle(winner: String) -> void:
-	combat_system.reset_battle()
-	battle_ended.emit(winner)
+func get_zone_data(zone_name: String) -> Dictionary:
+	return zones_data.get(zone_name, {})
 
-func change_zone(new_zone: String) -> void:
+func enter_zone(new_zone: String) -> void:
+	var old_zone = current_zone
 	current_zone = new_zone
-	zone_changed.emit(new_zone)
+	
+	if old_zone != new_zone:
+		zone_changed.emit(old_zone, new_zone)
+		print("Zone changed from", old_zone, "to", new_zone)
 
-func save_current_progress() -> Error:
-	return save_manager.save_game()
+func set_in_combat(state: bool) -> void:
+	is_in_combat = state
