@@ -2,6 +2,18 @@ extends Control
 
 class_name CombatUI
 
+# Input key constants (numeric values from Godot 4.x)
+const KEY_A = 65
+const KEY_NUMPAD1 = 96
+const KEY_Z = 90
+const KEY_NUMPAD2 = 103
+const KEY_I = 73
+const KEY_NUMPAD3 = 108
+const KEY_G = 71
+const KEY_NUMPAD4 = 109
+const KEY_Q = 81
+const KEY_ESCAPE = 65359
+
 # Autoload references (no type hints to avoid parse errors)
 var game_manager = null
 var combat_system = null
@@ -62,20 +74,20 @@ func _input(event: InputEvent) -> void:
 
 func handle_input(keycode: int) -> void:
 	match keycode:
-		KEY_A, KEY_1:
+		KEY_A, KEY_NUMPAD1:
 			execute_action(0)  # ATTACK
-		KEY_Z, KEY_2:
+		KEY_Z, KEY_NUMPAD2:
 			execute_action(1)  # MAGIC
-		KEY_I, KEY_3:
+		KEY_I, KEY_NUMPAD3:
 			execute_action(2)  # ITEM
-		KEY_G, KEY_4:
+		KEY_G, KEY_NUMPAD4:
 			execute_action(3)  # GUARD
 		KEY_Q, KEY_ESCAPE:
 			execute_action(4)  # FLEE
 
 func execute_action(action_index) -> void:
 	if combat_system:
-		combat_system.execute_action(action_index, null, null)
+		combat_system.execute_action(action_index, null, 0.0)
 
 func _on_turn_changed(actor_name: String) -> void:
 	update_ui()
@@ -107,10 +119,9 @@ func update_hp_bars() -> void:  # lint:ignore node_ref
 	if player_hp_container == null or enemy_hp_container == null:
 		return
 	
-	# Update player HP bars (named Bar0, Bar1, Bar2, Bar3)
 	for i in range(min(player_chars.size(), 4)):
-		var char = player_chars[i] if player_chars else null
-		if char and char.is_alive():
+		var char = player_chars[i] if player_chars.size() > i else null
+		if char and char.get_isalive():
 			var hp_bar = get_node_or_null("PlayerHPContainer/Bar" + str(i))
 			if hp_bar:
 				hp_bar.value = clampf(char.hp / char.max_hp * 100, 0.0, 100.0) if char and char.max_hp > 0 else 0.0
@@ -121,8 +132,8 @@ func update_enemy_hp_bars() -> void:  # lint:ignore node_ref
 		return
 	
 	for i in range(min(enemy_chars.size(), 4)):
-		var enemy = enemy_chars[i] if enemy_chars else null
-		if enemy and enemy.is_alive():
+		var enemy = enemy_chars[i] if enemy_chars.size() > i else null
+		if enemy and enemy.get_isalive():
 			var hp_bar = get_node_or_null("EnemyHPContainer/Bar" + str(i))
 			if hp_bar:
 				hp_bar.value = clampf(enemy.hp / enemy.max_hp * 100, 0.0, 100.0) if enemy and enemy.max_hp > 0 else 0.0

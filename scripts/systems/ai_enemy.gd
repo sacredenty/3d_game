@@ -1,6 +1,6 @@
 extends Node
 
-class_name Enemy extends Character
+class_name AIEnergy
 
 enum AIBehavior { AGGRESSIVE, DEFENSIVE, BALANCED }
 
@@ -36,21 +36,10 @@ func get_action() -> Dictionary:
 	return {"action": "attack", "weight": 1}
 
 func take_damage(amount: float, element: String) -> float:
-	var result = super.take_damage(amount, element)
-	
-	# Check for status effect triggers
-	if element == "fire" and randf() < 0.3:
-		add_status_effect("burn", 5)
-	elif element == "ice" and randf() < 0.3:
-		add_status_effect("freeze", 5)
-	elif element == "lightning" and randf() < 0.3:
-		add_status_effect("shock", 5)
-	
-	return result
+	# Placeholder for AI enemy damage handling
+	return 0.0
 
 func add_status_effect(effect_type: String, duration: int) -> void:
-	# Simplified status effect for enemies
-	# In full implementation, would use StatusEffect class
 	pass
 
 func calculate_drop_rate(item_name: String) -> float:

@@ -2,177 +2,160 @@ extends Node
 
 class_name CombatSystem
 
-enum Action { ATTACK = 0, MAGIC = 1, ITEM = 2, GUARD = 3, FLEE = 4 }
-
 signal turn_changed(actor_name: String)
 signal battle_won()
 signal battle_lost()
-signal action_executed(action: Action, target: Character?, damage: float?)
+signal enemy_turn_started(enemy_name: String)
+signal player_turn_started(player_name: String)
 
-var player_chars: Array[Character] = []
-var enemy_chars: Array[Enemy] = []
-var current_turn_actor: String = ""
+var current_enemy: Dictionary = {}
+var is_combat_active: bool = false
 var is_player_turn: bool = true
 var battle_ended: bool = false
+var turn_count: int = 0
+var combat_ui: Control = null
 
-func initialize() -> void:
-	player_chars.clear()
-	enemy_chars.clear()
+const DEFAULT_ENEMY_HP = 50.0
+const DEFAULT_ENEMY_ATTACK = 8.0
+const DEFAULT_ENEMY_MAGIC = 3.0
+const DEFAULT_ENEMY_DEFENSE = 2.0
+
+func _ready() -> void:
+	combat_ui = get_node_or_null("/root/CombatUI")
+	if combat_ui:
+		setup_combat_ui()
+
+func setup_combat_ui() -> void:
+	if not is_instance_valid(combat_ui):
+		return
+	
+	# Connect UI signals if they exist
+	if combat_ui.has_method("on_attack_pressed"):
+		combat_ui.attack_button.pressed.connect(_on_attack_pressed)
+	if combat_ui.has_method("on_magic_pressed"):
+		combat_ui.magic_button.pressed.connect(_on_magic_pressed)
+	if combat_ui.has_method("on_item_pressed"):
+		combat_ui.item_button.pressed.connect(_on_item_pressed)
+	if combat_ui.has_method("on_guard_pressed"):
+		combat_ui.guard_button.pressed.connect(_on_guard_pressed)
+	if combat_ui.has_method("on_flee_pressed"):
+		combat_ui.flee_button.pressed.connect(_on_flee_pressed)
+
+func start_combat(enemy_data: Dictionary = {}) -> void:
+	is_combat_active = true
 	battle_ended = false
 	is_player_turn = true
+	turn_count = 0
 	
-	if GameManager != null:
-		var party_data = GameManager.get_party_members()
-		for char_data in party_data:
-			var char := Character.new(char_data)
-			char.char_class = char_data.get("char_class", "warrior")
-			player_chars.append(char)
-	
-	if EncounterSystem != null:
-		var enemy_data = EncounterSystem.get_encounter_data()
-		for enemy_data in enemy_data:
-			var enemy := Enemy.new(enemy_data)
-			enemy.enemy_type = enemy_data.get("type", "slime")
-			enemy_chars.append(enemy)
-
-func execute_action(action: Action, target: Character?, damage: float?) -> void:
-	match action:
-		Action.ATTACK:
-			execute_attack(target, damage)
-		Action.MAGIC:
-			execute_magic(target, damage)
-		Action.ITEM:
-			execute_item(target, damage)
-		Action.GUARD:
-			execute_guard()
-		Action.FLEE:
-			execute_flee()
-
-func execute_attack(target: Character?, damage: float?) -> void:
-	if target == null and player_chars.size() > 0:
-		target = player_chars[0]
-	
-	for i in range(player_chars.size()):
-		var attacker = player_chars[i]
-		if not attacker.is_alive():
-			continue
-		
-		var actual_damage = damage if damage != null else calculate_attack_damage(attacker, target)
-		
-		if target:
-			target.take_damage(actual_damage)
-			print("Attack:", attacker.name, "->", target.name, "Damage:", actual_damage)
-			action_executed.emit(Action.ATTACK, target, actual_damage)
-		else:
-			for j in range(enemy_chars.size()):
-				var enemy = enemy_chars[j]
-				if enemy.is_alive():
-					enemy.take_damage(actual_damage)
-					print("Attack:", attacker.name, "->", enemy.name, "Damage:", actual_damage)
-					action_executed.emit(Action.ATTACK, enemy, actual_damage)
-
-func calculate_attack_damage(attacker: Character, target: Character?) -> float:
-	var base_dmg = attacker.attack_power * 1.5
-	if target == null:
-		base_dmg *= 0.8
-	
-	var variance = randf_range(0.9, 1.1)
-	return clampf(base_dmg * variance, 1.0, attacker.attack_power * 2.0)
-
-func execute_magic(target: Character?, damage: float?) -> void:
-	if target == null and player_chars.size() > 0:
-		target = player_chars[0]
-	
-	for i in range(player_chars.size()):
-		var caster = player_chars[i]
-		if not caster.is_alive():
-			continue
-		
-		var spell_power = caster.magic_power * 2.5 if caster.magic_power else caster.attack_power * 1.8
-		var actual_damage = damage if damage != null else clampf(spell_power, 10.0, 30.0)
-		
-		if target:
-			target.take_damage(actual_damage)
-			print("Magic:", caster.name, "->", target.name, "Damage:", actual_damage)
-			action_executed.emit(Action.MAGIC, target, actual_damage)
-		else:
-			for j in range(enemy_chars.size()):
-				var enemy = enemy_chars[j]
-				if enemy.is_alive():
-					enemy.take_damage(actual_damage)
-					print("Magic:", caster.name, "->", enemy.name, "Damage:", actual_damage)
-					action_executed.emit(Action.MAGIC, enemy, actual_damage)
-
-func execute_item(target: Character?, damage: float?) -> void:
-	if target == null and player_chars.size() > 0:
-		target = player_chars[0]
-	
-	for i in range(player_chars.size()):
-		var user = player_chars[i]
-		if not user.is_alive():
-			continue
-		
-		var heal_amount = 25.0 if damage != null else 30.0
-		user.heal(heal_amount)
-		
-		print("Item:", user.name, "Healed by", heal_amount)
-		action_executed.emit(Action.ITEM, user, -heal_amount)
-
-func execute_guard() -> void:
-	for i in range(player_chars.size()):
-		var char = player_chars[i]
-		if not char.is_alive():
-			continue
-		
-		char.set_defense(char.defense * 1.5 if char.defense else 2.0)
-		print("Guard:", char.name, "Defense increased")
-
-func execute_flee() -> void:
-	var success_chance = 0.7
-	if EncounterSystem != null and EncounterSystem.is_boss_encounter():
-		success_chance = 0.3
-	
-	if randf() < success_chance:
-		print("Fled successfully!")
-		get_tree().change_scene_to_packed(preload("res://scenes/main/main_scene.tscn"))
+	if enemy_data.is_empty():
+		current_enemy = {
+			"name": "Slime",
+			"hp": DEFAULT_ENEMY_HP,
+			"max_hp": DEFAULT_ENEMY_HP,
+			"attack_power": DEFAULT_ENEMY_ATTACK,
+			"magic_power": DEFAULT_ENEMY_MAGIC,
+			"defense": DEFAULT_ENEMY_DEFENSE
+		}
 	else:
-		print("Failed to flee!")
+		current_enemy = enemy_data
+	
+	if combat_ui and is_instance_valid(combat_ui):
+		combat_ui.start_combat(current_enemy)
+	
+	print("Combat started with:", current_enemy.get("name", "Unknown"))
 
-func enemy_turn() -> void:
-	is_player_turn = false
-	
-	if enemy_chars.is_empty():
-		end_battle(true)
-		return
-	
-	var active_enemy = null
-	for i in range(enemy_chars.size()):
-		var enemy = enemy_chars[i]
-		if enemy.is_alive():
-			active_enemy = enemy
-			break
-	
-	if not active_enemy:
-		end_battle(true)
-		return
-	
-	await get_tree().create_timer(1.0).timeout
-	
-	match randi() % 3:
-		0:
-			active_enemy.take_damage_from_attack(player_chars[0] if player_chars.size() > 0 else null)
-		1:
-			active_enemy.use_magic(player_chars[0] if player_chars.size() > 0 else null)
-		2:
-			active_enemy.heal(15.0)
-
-func end_battle(won: bool) -> void:
+func end_combat(won: bool) -> void:
+	is_combat_active = false
 	battle_ended = true
 	
 	if won:
 		battle_won.emit()
 	else:
 		battle_lost.emit()
+	
+	print("Combat ended, player:", "won" if won else "lost")
 
-func _process(delta: float) -> void:
-	pass
+func next_turn() -> void:
+	turn_count += 1
+	is_player_turn = not is_player_turn
+	
+	if is_player_turn:
+		player_turn_started.emit("Player")
+	else:
+		enemy_turn_started.emit(current_enemy.get("name", "Enemy"))
+	
+	turn_changed.emit(current_enemy.get("name", "Enemy") if not is_player_turn else "Player")
+
+func _on_attack_pressed() -> void:
+	if not is_combat_active or battle_ended:
+		return
+	
+	var damage = calculate_damage("attack", current_enemy.get("defense", DEFAULT_ENEMY_DEFENSE))
+	current_enemy["hp"] -= damage
+	
+	combat_ui.update_enemy_hp(current_enemy["hp"], current_enemy["max_hp"]) if combat_ui else null
+	
+	if current_enemy["hp"] <= 0:
+		end_combat(true)
+	else:
+		next_turn()
+
+func _on_magic_pressed() -> void:
+	if not is_combat_active or battle_ended:
+		return
+	
+	var damage = calculate_damage("magic", current_enemy.get("defense", DEFAULT_ENEMY_DEFENSE))
+	current_enemy["hp"] -= damage
+	
+	combat_ui.update_enemy_hp(current_enemy["hp"], current_enemy["max_hp"]) if combat_ui else null
+	
+	if current_enemy["hp"] <= 0:
+		end_combat(true)
+	else:
+		next_turn()
+
+func _on_item_pressed() -> void:
+	if not is_combat_active or battle_ended:
+		return
+	
+	combat_ui.use_item() if combat_ui and is_instance_valid(combat_ui) else null
+
+func _on_guard_pressed() -> void:
+	if not is_combat_active or battle_ended:
+		return
+	
+	combat_ui.activate_guard() if combat_ui and is_instance_valid(combat_ui) else null
+
+func _on_flee_pressed() -> void:
+	if not is_combat_active or battle_ended:
+		return
+	
+	end_combat(true)
+
+func calculate_damage(action_type: String, enemy_defense: float) -> float:
+	var base_damage = 15.0 if action_type == "attack" else 20.0
+	var variance = randf_range(-0.3, 0.3)
+	
+	return max(1.0, (base_damage * (1 + variance)) - enemy_defense)
+
+func get_enemy_data() -> Dictionary:
+	return current_enemy.duplicate()
+
+func execute_action(action_index: int, target: Node = null, power: float = 0.0) -> void:
+	if not is_combat_active or battle_ended:
+		return
+	
+	match action_index:
+		0: _on_attack_pressed()
+		1: _on_magic_pressed()
+		2: _on_item_pressed()
+		3: _on_guard_pressed()
+		4: _on_flee_pressed()
+
+func get_current_turn_actor() -> Dictionary:
+	return {
+		"name": "Player" if is_player_turn else current_enemy.get("name", "Enemy"),
+		"is_player": is_player_turn,
+		"hp": 100.0 if is_player_turn else current_enemy.get("hp", 50.0),
+		"max_hp": 100.0 if is_player_turn else current_enemy.get("max_hp", 50.0)
+	}

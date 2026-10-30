@@ -1,0 +1,18 @@
+{
+  "name": "Player Movement Test",
+  "scene_path": "res://scenes/main/main_scene.tscn",
+  "viewport_size": {"width": 800, "height": 600},
+  "settle_frames": 10,
+  "steps": [
+    {"type": "dump_tree", "properties": ["position"], "label": "initial_position"},
+    {"type": "action", "action": "move_right"},
+    {"type": "wait_frames", "frames": 5},
+    {"type": "dump_tree", "properties": ["position"], "label": "after_move_right"},
+    {"type": "assert", "assertion": "property", "node_path": "OverworldLevel/PlayerController/Sprite2D", "property": "position", "expected_min": 32},
+    {"type": "action", "action": "move_up"},
+    {"type": "wait_frames", "frames": 5},
+    {"type": "dump_tree", "properties": ["position"], "label": "after_move_up"},
+    {"type": "assert", "assertion": "property", "node_path": "OverworldLevel/PlayerController/Sprite2D", "property": "position", "expected_min_y": 32},
+    {"type": "ui_report", "ascii": true, "fail_on": ["zero_size"]}
+  ]
+}

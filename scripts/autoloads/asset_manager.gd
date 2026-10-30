@@ -10,7 +10,7 @@ func load_texture(path: String) -> Texture2D:
 	if key in texture_cache:
 		return texture_cache[key]
 	
-	var tex := ImageLoader.load(path)
+	var tex := load(path)
 	texture_cache[key] = tex
 	return tex
 

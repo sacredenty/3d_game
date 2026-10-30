@@ -4,15 +4,15 @@ class_name PartyManager
 
 const MAX_PARTY_SIZE = 4
 
-@onready var party: Array[Character] = []
+@onready var party: Array[Node] = []
 var active_character_index: int = -1
 
-signal character_added(character: Character)
-signal character_removed(character: Character)
-signal active_character_changed(index: int, character: Character)
+signal character_added(character: Node)
+signal character_removed(character: Node)
+signal active_character_changed(index: int, character: Node)
 signal all_characters_dead()
 
-func add_character(char: Character) -> void:
+func add_character(char: Node) -> void:
 	if party.size() >= MAX_PARTY_SIZE:
 		push_warning("Party is full!")
 		return
@@ -45,25 +45,25 @@ func set_active_character(index: int) -> void:
 	if old_char != new_char:
 		active_character_changed.emit(index, new_char)
 
-func get_active_character() -> Character:
+func get_active_character() -> Node:
 	if active_character_index < 0 or active_character_index >= party.size():
 		return null
 	return party[active_character_index]
 
 func is_alive(index: int = -1) -> bool:
 	var char_to_check = get_active_character() if index == -1 else party[index]
-	return char_to_check and char_to_check.is_alive()
+	return char_to_check and char_to_check.get_isalive()
 
 func all_dead() -> bool:
 	for char in party:
-		if char and char.is_alive():
+		if char and char.get_isalive():
 			return false
 	return true
 
 func heal_all(amount: int) -> void:
 	for i in range(party.size()):
 		var char = party[i]
-		if char and char.is_alive():
+		if char and char.get_isalive():
 			char.heal(amount)
 
 # Serialization for save/load

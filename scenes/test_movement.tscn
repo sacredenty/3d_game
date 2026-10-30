@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://testmov001"]
+
+[ext_resource type="Script" path="res://scripts/test_movement.gd" id="1::test_mov"]
+
+[node name="MovementTester" type="Node2D"]
+script = ExtResource("1::test_mov")

@@ -2,6 +2,18 @@ extends Control
 
 class_name BattleScene
 
+# Input key constants (numeric values from Godot 4.x)
+const KEY_A = 65
+const KEY_NUMPAD1 = 96
+const KEY_Z = 90
+const KEY_NUMPAD2 = 103
+const KEY_I = 73
+const KEY_NUMPAD3 = 108
+const KEY_G = 71
+const KEY_NUMPAD4 = 109
+const KEY_Q = 81
+const KEY_ESCAPE = 65359
+
 @onready var game_manager: GameManager = null
 @onready var combat_system: CombatSystem = null
 @onready var encounter_system: EncounterSystem = null
@@ -10,8 +22,8 @@ class_name BattleScene
 @onready var player_hp_container: HPBarContainer = null
 @onready var enemy_hp_container: HPBarContainer = null
 
-var player_chars: Array[Character] = []
-var enemy_chars: Array[Enemy] = []
+var player_chars: Array[Node] = []
+var enemy_chars: Array[Node] = []
 var is_player_turn: bool = true
 var current_action_index: int = 0
 
@@ -26,7 +38,6 @@ func _ready() -> void:
 	combat_system.battle_lost.connect(_on_battle_lost)
 	combat_system.action_executed.connect(_on_action_executed)
 	
-	# Initialize combat state
 	if combat_system:
 		combat_system.initialize()
 
@@ -39,23 +50,22 @@ func _input(event: InputEvent) -> void:
 
 func handle_input(keycode: int) -> void:
 	match keycode:
-		KEY_a, KEY_1:
-			execute_action(Action.ATTACK)
-		KEY_z, KEY_2:
-			execute_action(Action.MAGIC)
-		KEY_i, KEY_3:
-			execute_action(Action.ITEM)
-		KEY_g, KEY_4:
-			execute_action(Action.GUARD)
-		KEY_q, KEY_ESCAPE:
-			execute_action(Action.FLEE)
+		KEY_A, KEY_NUMPAD1:
+			execute_action(0)
+		KEY_Z, KEY_NUMPAD2:
+			execute_action(1)
+		KEY_I, KEY_NUMPAD3:
+			execute_action(2)
+		KEY_G, KEY_NUMPAD4:
+			execute_action(3)
+		KEY_Q, KEY_ESCAPE:
+			execute_action(4)
 
-func execute_action(action: CombatSystem.Action) -> void:
+func execute_action(action_index: int) -> void:
 	if not is_player_turn or combat_system.battle_ended:
 		return
 	
-	current_action_index = action.index
-	combat_system.execute_action(action, null, null)
+	combat_system.execute_action(action_index, null, 0.0)
 
 func _on_turn_changed(actor_name: String) -> void:
 	print("Turn:", actor_name)
@@ -76,18 +86,17 @@ func _on_battle_lost() -> void:
 	print("Battle lost!")
 	get_tree().change_scene_to_packed(preload("res://scenes/main/main_scene.tscn"))
 
-func _on_action_executed(action: CombatSystem.Action, target: Character?, damage: float?) -> void:
-	print("Action:", action, "Target:", target.name if target else null, "Damage:", damage)
+func _on_action_executed(action_index: int, target: Node?, damage: float) -> void:
+	print("Action:", action_index, "Target:", target.name if target else null, "Damage:", damage)
 	update_ui()
 
 func update_ui() -> void:
 	if player_hp_container == null or enemy_hp_container == null:
 		return
 	
-	# Update player HP bars (named Bar0, Bar1, Bar2, Bar3)
 	for i in range(min(player_chars.size(), 4)):
-		var char = player_chars[i] if player_chars else null
-		if char and char.is_alive():
+		var char = player_chars[i] if player_chars.size() > i else null
+		if char and char.get_isalive():
 			var hp_bar = get_node_or_null("PlayerHPContainer/Bar" + str(i))
 			if hp_bar:
 				hp_bar.value = clampf(char.hp / char.max_hp * 100, 0.0, 100.0) if char and char.max_hp > 0 else 0.0
@@ -98,8 +107,8 @@ func update_enemy_ui() -> void:
 		return
 	
 	for i in range(min(enemy_chars.size(), 4)):
-		var enemy = enemy_chars[i] if enemy_chars else null
-		if enemy and enemy.is_alive():
+		var enemy = enemy_chars[i] if enemy_chars.size() > i else null
+		if enemy and enemy.get_isalive():
 			var hp_bar = get_node_or_null("EnemyHPContainer/Bar" + str(i))
 			if hp_bar:
 				hp_bar.value = clampf(enemy.hp / enemy.max_hp * 100, 0.0, 100.0) if enemy and enemy.max_hp > 0 else 0.0

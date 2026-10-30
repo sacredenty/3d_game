@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3 uid="uid://ovwlevel123"]
+
+[node name="OverworldLevel" type="Node2D"]
+
+[node name="Background" type="ColorRect" parent="."]
+size = Vector2(800, 600)
+color = Color(0.15, 0.2, 0.1, 1)
+
+[node name="PlayerController" type="CharacterBody2D" parent="."]
+player_controller/collision_layer = 1
+player_controller/collision_mask = 1
+player_controller/script = "res://scripts/systems/overworld/player_controller.gd"
+
+[node name="Sprite2D" type="Sprite2D" parent="PlayerController"]
+sprite_2d/texture = "res://textures/grass.png"
+sprite_2d/modulate = Color(0.2, 0.8, 0.2, 1)
+sprite_2d/offset_left = -8
+sprite_2d/offset_top = -8
+
+[node name="OverworldMap" type="Node2D" parent="."]
+overworld_map/script = "res://scripts/systems/overworld/overworld_map.gd"

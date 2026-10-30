@@ -2,7 +2,6 @@ extends Node2D
 
 class_name Character
 
-@export var name: String = "Player"
 @export var char_class: String = "warrior"
 @export var level: int = 1
 @export var attack_power: float = 10.0
@@ -13,7 +12,7 @@ class_name Character
 var hp: float = 100.0
 var max_hp: float = 100.0
 var current_defense: float = 3.0
-var is_alive: bool = true
+var _is_alive: bool = true
 
 func new(data: Dictionary) -> Character:
 	var char := Character.new()
@@ -40,17 +39,17 @@ func get_class_base_hp(class_type: String, lvl: int) -> float:
 	return 80.0
 
 func take_damage(amount: float) -> void:
-	if not is_alive:
+	if not _is_alive:
 		return
 	
 	var actual_dmg = amount - current_defense if amount > current_defense else 0.0
 	hp -= actual_dmg
-	is_alive = hp <= 0
+	_is_alive = hp <= 0
 	
 	print(name, "HP:", roundf(hp), "/", roundf(max_hp))
 
 func heal(amount: float) -> void:
-	if not is_alive:
+	if not _is_alive:
 		return
 	
 	var old_max = max_hp
@@ -62,5 +61,5 @@ func heal(amount: float) -> void:
 func set_defense(new_defense: float) -> void:
 	current_defense = new_defense
 
-func is_alive() -> bool:
+func get_is_alive() -> bool:
 	return hp > 0

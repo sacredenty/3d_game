@@ -120,7 +120,7 @@ func get_random_room_type() -> RoomType:
 
 func should_place_exit() -> bool:
 	var exit_rooms = [r for r in rooms if r["type"] == RoomType.EXIT]
-	return exit_rooms.size() > 0
+	return len(exit_rooms) > 0
 
 func create_corridor(x1: int, y1: int, x2: int, y2: int) -> void:
 	# Horizontal corridor first

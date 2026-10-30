@@ -2,6 +2,16 @@ extends Control
 
 class_name DungeonScene
 
+const KEY_ESCAPE = 65359
+const KEY_w = 87
+const KEY_s = 83
+const KEY_a = 65
+const KEY_d = 68
+const KEY_UP = 38
+const KEY_DOWN = 40
+const KEY_LEFT = 37
+const KEY_RIGHT = 39
+
 @onready var dungeon_generator: DungeonGenerator = null
 
 var player_position: Vector2i = Vector2i(1, 1)

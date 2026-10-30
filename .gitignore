@@ -36,3 +36,7 @@ assets/**/*.png
 # Unused addons (not referenced in project)
 addons/godot_ai/
 addons/godot_omni/
+addons/
+
+# Generated assets (placeholder pixel art)
+assets/**/*.png

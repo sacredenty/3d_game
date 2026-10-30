@@ -64,7 +64,7 @@ func _get_random_enemy() -> Dictionary:
 		}
 
 func trigger_random_encounter() -> bool:
-	if EncounterSystem != null and EncounterSystem.is_boss_encounter():
+	if is_boss_encounter():
 		return false
 	
 	var encounter_chance = 0.15 if GameManager != null else 0.2
@@ -73,8 +73,6 @@ func trigger_random_encounter() -> bool:
 		current_encounter_data = get_encounter_data()[0]
 		encounter_started.emit()
 		return true
-	
-	return false
 
 func trigger_boss_encounter() -> bool:
 	is_boss_encounter = true
@@ -89,5 +87,5 @@ func trigger_boss_encounter() -> bool:
 	encounter_started.emit()
 	return true
 
-func is_boss_encounter() -> bool:
+func get_is_boss_encounter() -> bool:
 	return is_boss_encounter

@@ -11,7 +11,7 @@ func _ready() -> void:
 	instance.tree_root_changed.connect(_on_tree_root_changed)
 
 func _on_tree_root_changed(new_root: Node) -> void:
-	get_tree().root = new_root
+	print("Tree root changed to:", new_root.name)
 
 # Override to handle game start
 func _process(delta):

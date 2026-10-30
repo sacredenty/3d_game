@@ -1,0 +1,45 @@
+[gd_resource type="TileSet" format_type=1]
+
+[ext_resource type="Texture2D" uid="uid://grass001"]
+[ext_resource type="Texture2D" uid="uid://dirt002"]
+[ext_resource type="Texture2D" uid="uid://sand003"]
+[ext_resource type="Texture2D" uid="uid://water004"]
+[ext_resource type="Texture2D" uid="uid://cave005"]
+[ext_resource type="Texture2D" uid="uid://bush006"]
+[ext_resource type="Texture2D" uid="uid://fountain007"]
+[ext_resource type="Texture2D" uid="uid://campfire008"]
+[ext_resource type="Texture2D" uid="uid://chest009"]
+[ext_resource type="Texture2D" uid="uid://door010"]
+[ext_resource type="Texture2D" uid="uid://bridge011"]
+
+[tile_set/tile_size]
+enum = Vector2i(32, 32)
+
+[tile_set/margin_left]
+enum = 0
+
+[tile_set/margin_top]
+enum = 0
+
+[tile_set/margin_right]
+enum = 0
+
+[tile_set/margin_bottom]
+enum = 0
+
+[tile_set/tiles]
+enum = [
+	{"ext_resource": {"uid": "uid://grass001"}, "gid": "gid://tileset/grass", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://dirt002"}, "gid": "gid://tileset/dirt", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://sand003"}, "gid": "gid://tileset/sand", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://water004"}, "gid": "gid://tileset/water", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://cave005"}, "gid": "gid://tileset/cave_wall", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://bush006"}, "gid": "gid://tileset/bush", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://fountain007"}, "gid": "gid://tileset/fountain", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://campfire008"}, "gid": "gid://tileset/campfire", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://chest009"}, "gid": "gid://tileset/chest", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://door010"}, "gid": "gid://tileset/door", "h_flip": false, "v_flip": false},
+	{"ext_resource": {"uid": "uid://bridge011"}, "gid": "gid://tileset/bridge", "h_flip": false, "v_flip": false}
+]
+
+[gd_scene load_steps=2 format=3 uid="uid://ovwts456"]
