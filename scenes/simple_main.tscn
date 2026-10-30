@@ -10,8 +10,21 @@ color = Color(0.15, 0.2, 0.1, 1)
 position = Vector2(400, 300)
 collision_layer = 1
 collision_mask = 1
-script = "res://scripts/player_movement.gd"
+script = "res://scripts/systems/overworld/player_controller.gd"
 
 [node name="Sprite" type="ColorRect" parent="Player"]
 size = Vector2(16, 16)
 color = Color(0.2, 0.8, 0.2, 1)
+
+[node name="NPC" type="CharacterBody2D" parent="."]
+position = Vector2(400, 300)
+collision_layer = 2
+collision_mask = 4
+script = "res://scripts/systems/overworld/npc_controller.gd"
+
+[node name="NPSprite" type="ColorRect" parent="NPC"]
+size = Vector2(16, 16)
+color = Color(0.3, 0.5, 1, 1)
+
+[node name="OverworldMap" type="Node2D" parent="."]
+script = "res://scripts/systems/overworld/overworld_map.gd"

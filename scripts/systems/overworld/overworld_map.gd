@@ -11,17 +11,24 @@ var map_size: Vector2i = Vector2i(8, 6)
 var tiles_data: Dictionary = {}
 var tile_size: int = 32
 var player_sprite: Node2D = null  # Changed to regular var for flexibility
+var npc_sprite: Node2D = null
 
 func _process(delta):
 	if is_instance_valid(player_sprite):
 		var x = player_position.x * tile_size + tile_size / 2
 		var y = player_position.y * tile_size + tile_size / 2
 		player_sprite.position = Vector2(x, y)
+	
+	if is_instance_valid(npc_sprite):
+		var x = target_npc_position.x * tile_size + tile_size / 2
+		var y = target_npc_position.y * tile_size + tile_size / 2
+		npc_sprite.position = Vector2(x, y)
 
 func _ready() -> void:
 	print("=== OverworldMap._ready() START ===")
 	create_background()
 	find_player_sprite()
+	find_npc_sprite()
 	
 	for x in range(map_size.x):
 		for y in range(map_size.y):
@@ -38,10 +45,17 @@ func find_player_sprite():
 			print("OverworldMap: Found player sprite at", player_sprite.position)
 		else:
 			print("ERROR: OverworldMap: Sprite2D not found in PlayerController!")
-	else:
-		print("ERROR: OverworldMap: PlayerController node NOT found!")
-	if not is_instance_valid(player_sprite):
-		print("Warning: Player sprite not found")
+
+func find_npc_sprite():
+	var npc = get_node_or_null("/root/MainScene/Overworld/NPCController")
+	if is_instance_valid(npc):
+		npc_sprite = npc.get_node_or_null("Sprite2D")
+		if is_instance_valid(npc_sprite):
+			print("OverworldMap: Found NPC sprite at", npc_sprite.position)
+		else:
+			print("ERROR: OverworldMap: Sprite2D not found in NPCController!")
+
+var target_npc_position: Vector2i = Vector2i(1, 1)
 
 func create_background():
 	var bg_rect = ColorRect.new()
@@ -69,6 +83,10 @@ func move_player(dx: int, dy: int) -> void:
 		tiles_data[old_key] = "dirt"
 	
 	player_moved.emit(player_position)
+	
+	# Update NPC target position when player moves
+	target_npc_position.x = clampi(target_npc_position.x + dx, 0, map_size.x - 1)
+	target_npc_position.y = clampi(target_npc_position.y + dy, 0, map_size.y - 1)
 
 func get_terrain_type(x: int, _y: int) -> String:
 	return "grass" if x > 2 else "dirt"

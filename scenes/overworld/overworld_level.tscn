@@ -17,5 +17,16 @@ sprite_2d/modulate = Color(0.2, 0.8, 0.2, 1)
 sprite_2d/offset_left = -8
 sprite_2d/offset_top = -8
 
+[node name="NPCController" type="CharacterBody2D" parent="."]
+npc_controller/collision_layer = 2
+npc_controller/collision_mask = 4
+npc_controller/script = "res://scripts/systems/overworld/npc_controller.gd"
+
+[node name="Sprite2D" type="Sprite2D" parent="NPCController"]
+sprite_2d/texture = "res://textures/npc.png"
+sprite_2d/modulate = Color(0.3, 0.5, 1, 1)
+sprite_2d/offset_left = -8
+sprite_2d/offset_top = -8
+
 [node name="OverworldMap" type="Node2D" parent="."]
 overworld_map/script = "res://scripts/systems/overworld/overworld_map.gd"

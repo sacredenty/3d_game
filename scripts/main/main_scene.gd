@@ -46,13 +46,38 @@ func _ready() -> void:
 	sprite.color = Color(0.2, 0.8, 0.2, 1)  # Green player
 	player.add_child(sprite)
 	print("Added player sprite at", sprite.position, "color:", sprite.color)
+
+	# Add NPC controller (blue figure that follows player)
+	var npc = CharacterBody2D.new()
+	npc.name = "NPCController"
+	npc.position = Vector2(400, 300)
+	npc.collision_layer = 2
+	npc.collision_mask = 4
 	
+	# Attach NPC movement script
+	var npc_script = load("res://scripts/systems/overworld/npc_controller.gd")
+	if npc_script != null:
+		npc.set_script(npc_script)
+		print("Attached NPC controller script")
+	else:
+		print("ERROR: Could not load NPC controller script!")
+	
+	root.add_child(npc)
+
+	# Add sprite to NPC (blue color)
+	var npc_sprite = ColorRect.new()
+	npc_sprite.name = "Sprite2D"
+	npc_sprite.size = Vector2(16, 16)
+	npc_sprite.color = Color(0.3, 0.5, 1, 1)  # Blue NPC
+	npc.add_child(npc_sprite)
+	print("Added NPC sprite at", npc_sprite.position, "color:", npc_sprite.color)
+
 	# Add OverworldMap node for grid tracking
 	var overworld_map = Node2D.new()
 	overworld_map.name = "OverworldMap"
 	overworld_map.set_script(load("res://scripts/systems/overworld/overworld_map.gd"))
 	root.add_child(overworld_map)
-	
+
 	await get_tree().process_frame
 	
 	print("=== After first frame ===")
@@ -60,6 +85,11 @@ func _ready() -> void:
 		print("Player sprite visible at:", sprite.position, "color:", sprite.color)
 	else:
 		print("ERROR: Player sprite not found!")
+	
+	if is_instance_valid(npc_sprite):
+		print("NPC sprite visible at:", npc_sprite.position, "color:", npc_sprite.color)
+	else:
+		print("ERROR: NPC sprite not found!")
 
 	# Create CombatUI as CanvasLayer
 	combat_ui = preload("res://scenes/ui/combat_ui.tscn").instantiate()
