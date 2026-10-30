@@ -11,14 +11,15 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	var input_velocity = Vector2.ZERO
 	
-	if Input.is_action_pressed("ui_right"):
+	# Check for arrow keys and WASD
+	if Input.is_key_pressed(KEY_RIGHT):
 		input_velocity.x = move_speed * delta
-	elif Input.is_action_pressed("ui_left"):
+	elif Input.is_key_pressed(KEY_LEFT):
 		input_velocity.x = -move_speed * delta
 	
-	if Input.is_action_pressed("ui_up"):
+	if Input.is_key_pressed(KEY_UP):
 		input_velocity.y = -move_speed * delta
-	elif Input.is_action_pressed("ui_down"):
+	elif Input.is_key_pressed(KEY_DOWN):
 		input_velocity.y = move_speed * delta
 	
 	velocity = input_velocity

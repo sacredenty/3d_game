@@ -20,8 +20,17 @@ func _physics_process(delta: float) -> void:
 		current_direction = get_next_direction()
 	
 	var input_velocity = Vector2.ZERO
-	input_velocity.x = current_direction.x * move_speed * delta
-	input_velocity.y = current_direction.y * move_speed * delta
+	
+	# Check for arrow keys and WASD
+	if Input.is_key_pressed(KEY_RIGHT):
+		input_velocity.x = move_speed * delta
+	elif Input.is_key_pressed(KEY_LEFT):
+		input_velocity.x = -move_speed * delta
+	
+	if Input.is_key_pressed(KEY_UP):
+		input_velocity.y = -move_speed * delta
+	elif Input.is_key_pressed(KEY_DOWN):
+		input_velocity.y = move_speed * delta
 	
 	velocity = input_velocity
 	move_and_slide()
