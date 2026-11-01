@@ -60,6 +60,8 @@ const ITEM_CATALOG := {
 	"Swift Boots": {"type": "feet", "attack": 1, "magic": 0, "defense": 1, "price": 70, "sell_price": 35, "description": "+1 physical damage, +1 defense."}
 }
 
+@export var initial_mode: String = "continue"
+
 class ExplorationMap extends Control:
 	var game: Node
 
@@ -178,13 +180,19 @@ var hero_name_input: LineEdit
 var hero_class_picker: OptionButton
 var hero_stats_label: Label
 var begin_adventure_button: Button
+var hero_creation_cancel_button: Button
 var save_load_layer: CanvasLayer
 var save_load_title: Label
 var save_slot_rows: Array[HBoxContainer] = []
 var save_slot_labels: Array[Label] = []
 var save_slot_load_buttons: Array[Button] = []
+var save_slot_save_buttons: Array[Button] = []
+var save_load_description: Label
+var save_load_close_button: Button
 var save_overwrite_dialog: ConfirmationDialog
 var pending_save_slot: int = -1
+var startup_load_only: bool = false
+var startup_new_game: bool = false
 var shop_layer: CanvasLayer
 var shop_status: Label
 var shop_catalog_list: VBoxContainer
@@ -204,15 +212,31 @@ var journal_tab_button: Button
 
 func _ready() -> void:
 	save_slot_prefix = progress_save_path.get_basename()
+	for slot_index in range(SAVE_SLOT_COUNT):
+		var slot_suffix := "_slot_%d" % (slot_index + 1)
+		if save_slot_prefix.ends_with(slot_suffix):
+			save_slot_prefix = save_slot_prefix.trim_suffix(slot_suffix)
+			break
 	_build_world()
 	_build_player()
 	_build_npc()
 	_build_interface()
-	if FileAccess.file_exists(progress_save_path):
-		load_progress(progress_save_path)
-		_update_player_appearance()
-	else:
-		_begin_hero_creation()
+	match initial_mode:
+		"new_game":
+			startup_new_game = true
+			_start_fresh_game()
+		"load_slots":
+			startup_load_only = true
+			_open_save_load_ui()
+		_:
+			if FileAccess.file_exists(progress_save_path) and load_progress(progress_save_path):
+				_update_player_appearance()
+			elif FileAccess.file_exists(progress_save_path):
+				startup_load_only = true
+				_open_save_load_ui()
+				save_load_title.text = "CONTINUE FAILED  ·  Choose another save slot."
+			else:
+				_begin_hero_creation()
 	_sync_exploration_markers()
 	_update_hud()
 
@@ -784,6 +808,11 @@ func _build_hero_creation() -> void:
 	begin_adventure_button = _make_button("Begin Adventure")
 	begin_adventure_button.pressed.connect(_confirm_hero_creation)
 	buttons.add_child(begin_adventure_button)
+	var cancel_button := _make_button("Cancel  ·  Return to Title")
+	cancel_button.pressed.connect(_return_to_title)
+	cancel_button.hide()
+	buttons.add_child(cancel_button)
+	hero_creation_cancel_button = cancel_button
 	creation_layer.hide()
 
 func _begin_hero_creation() -> void:
@@ -793,6 +822,7 @@ func _begin_hero_creation() -> void:
 	_update_player_appearance()
 	_roll_hero_stats()
 	player.set("movement_enabled", false)
+	hero_creation_cancel_button.visible = startup_new_game
 	creation_layer.show()
 
 func _on_hero_class_selected(index: int) -> void:
@@ -845,6 +875,8 @@ func _confirm_hero_creation() -> void:
 		hero_name_input.placeholder_text = "Please enter a name"
 		return
 	hero_name = entered_name
+	startup_new_game = false
+	hero_creation_cancel_button.hide()
 	player_hp = max_hp()
 	player_mp = max_mp()
 	_update_player_appearance()
@@ -875,10 +907,12 @@ func _build_save_load_ui(screen: Control) -> void:
 	save_load_title = _make_label("SAVE / LOAD ADVENTURE", 22, Color("f4e3b8"))
 	save_load_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(save_load_title)
-	content.add_child(_make_label("Saving stores the current hero and world progress in that slot.", 14, Color("d5ddcf")))
+	save_load_description = _make_label("Saving stores the current hero and world progress in that slot.", 14, Color("d5ddcf"))
+	content.add_child(save_load_description)
 	save_slot_rows.clear()
 	save_slot_labels.clear()
 	save_slot_load_buttons.clear()
+	save_slot_save_buttons.clear()
 	for slot_index in range(SAVE_SLOT_COUNT):
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
@@ -890,6 +924,7 @@ func _build_save_load_ui(screen: Control) -> void:
 		save_button.custom_minimum_size = Vector2(100, 36)
 		save_button.pressed.connect(_request_save_slot.bind(slot_index))
 		row.add_child(save_button)
+		save_slot_save_buttons.append(save_button)
 		var load_button := _make_button("Load")
 		load_button.custom_minimum_size = Vector2(100, 36)
 		load_button.pressed.connect(_load_slot.bind(slot_index))
@@ -897,10 +932,10 @@ func _build_save_load_ui(screen: Control) -> void:
 		save_slot_rows.append(row)
 		save_slot_labels.append(slot_label)
 		save_slot_load_buttons.append(load_button)
-	var close_button := _make_button("Return to Game")
-	close_button.custom_minimum_size = Vector2(220, 38)
-	close_button.pressed.connect(_close_save_load_ui)
-	content.add_child(close_button)
+	save_load_close_button = _make_button("Return to Game")
+	save_load_close_button.custom_minimum_size = Vector2(220, 38)
+	save_load_close_button.pressed.connect(_close_save_load_ui)
+	content.add_child(save_load_close_button)
 	save_overwrite_dialog = ConfirmationDialog.new()
 	save_overwrite_dialog.title = "Overwrite save?"
 	save_overwrite_dialog.dialog_text = "This save slot already contains progress."
@@ -919,9 +954,22 @@ func _open_save_load_ui() -> void:
 		return
 	player.set("movement_enabled", false)
 	_update_save_slot_rows()
+	for save_button in save_slot_save_buttons:
+		save_button.visible = not startup_load_only
+	if startup_load_only:
+		save_load_title.text = "LOAD ADVENTURE"
+		save_load_description.text = "Choose a saved adventure to continue."
+		save_load_close_button.text = "Return to Title"
+	else:
+		save_load_title.text = "SAVE / LOAD ADVENTURE"
+		save_load_description.text = "Saving stores the current hero and world progress in that slot."
+		save_load_close_button.text = "Return to Game"
 	save_load_layer.show()
 
 func _close_save_load_ui() -> void:
+	if startup_load_only:
+		_return_to_title()
+		return
 	save_load_layer.hide()
 	if not creation_layer.visible and not battle_active and not inventory_layer.visible and not shop_layer.visible:
 		player.set("movement_enabled", true)
@@ -975,6 +1023,7 @@ func _confirm_save_slot() -> void:
 		save_load_title.text = "SAVE FAILED"
 		return
 	progress_save_path = path
+	startup_load_only = false
 	save_load_title.text = "SAVED  ·  %s the %s" % [hero_name, hero_class]
 	_update_save_slot_rows()
 	pending_save_slot = -1
@@ -1571,6 +1620,7 @@ func _load_slot(slot_index: int) -> void:
 		_update_save_slot_rows()
 		return
 	progress_save_path = path
+	startup_load_only = false
 	encounter_started = false
 	battle_active = false
 	dialogue_active = false
@@ -2343,3 +2393,9 @@ func _start_fresh_game() -> void:
 	player.position = Vector2(250, 448)
 	_begin_hero_creation()
 	_update_hud()
+
+func _return_to_title() -> void:
+	var menu_scene: PackedScene = load("res://scenes/ui/main_menu.tscn")
+	var change_error := get_tree().change_scene_to_packed(menu_scene)
+	if change_error != OK:
+		push_error("Could not return to the title screen: %s" % error_string(change_error))

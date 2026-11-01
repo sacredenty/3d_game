@@ -19,8 +19,14 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 ## How to Run
 
 1. Open Godot 4 in this directory
-2. Run the default `res://scenes/game.tscn` scene
+2. Run the default title menu (`res://scenes/ui/main_menu.tscn`)
 3. Press F5 or run from the Play button
+
+## Title Menu
+
+- **Continue** resumes the latest updated adventure, including a save slot selected from Load Game, and is disabled when no save exists.
+- **Load Game** opens the three save slots and is disabled when no slot save exists.
+- **New Game** opens hero creation. The current save is not replaced until **Begin Adventure** is confirmed; canceling returns to the title menu.
 
 ## Controls
 

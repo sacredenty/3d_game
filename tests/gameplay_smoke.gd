@@ -10,11 +10,14 @@ func _run() -> void:
 	_remove_test_file(save_path)
 	var game: Node = load("res://scenes/game.tscn").instantiate()
 	game.set("progress_save_path", save_path)
+	game.set("initial_mode", "new_game")
 	root.add_child(game)
 	await process_frame
 
 	var player: CharacterBody2D = game.get("player")
 	_check(game.get("creation_layer").visible, "A new game should begin with hero creation")
+	_check(game.get("hero_creation_cancel_button").visible, "A title-menu new game should allow returning without saving")
+	_check(not FileAccess.file_exists(save_path), "Opening title-menu hero creation should not overwrite a save")
 	var interact_during_creation := InputEventKey.new()
 	interact_during_creation.physical_keycode = KEY_E
 	interact_during_creation.pressed = true
@@ -500,6 +503,32 @@ func _run() -> void:
 	_check(FileAccess.file_exists("user://gameplay_save_ui_slot_1.json"), "Saving should create a slot file")
 	_check(not save_ui_game.get("save_slot_load_buttons")[0].disabled, "Saved slots should become loadable")
 	_check(save_ui_game.get("save_slot_labels")[0].text.contains("Slot Hero the Rogue"), "Slot summaries should identify the saved hero")
+	var startup_load_game: Node = load("res://scenes/game.tscn").instantiate()
+	startup_load_game.set("progress_save_path", ui_test_path)
+	startup_load_game.set("initial_mode", "load_slots")
+	root.add_child(startup_load_game)
+	await process_frame
+	_check(startup_load_game.get("save_load_layer").visible, "Load Game should open directly into save-slot selection")
+	_check(not startup_load_game.get("save_slot_save_buttons")[0].visible, "Title-menu load mode should not offer save actions")
+	_check(not startup_load_game.get("save_slot_load_buttons")[0].disabled, "Title-menu load should expose available saves")
+	startup_load_game.call("_load_slot", 0)
+	_check(not startup_load_game.get("save_load_layer").visible, "Loading a title-menu save should enter the game")
+	_check(startup_load_game.get("hero_name") == "Slot Hero", "Title-menu Load should restore the selected hero")
+	_check(startup_load_game.get("gold") == 64, "Title-menu Load should restore the selected save state")
+	startup_load_game.call("_open_save_load_ui")
+	_check(startup_load_game.get("save_slot_save_buttons")[0].visible, "Save actions should appear after loading a title-menu save")
+	_check(startup_load_game.get("save_load_close_button").text == "Return to Game", "Loaded games should return to normal Save / Load mode")
+	startup_load_game.queue_free()
+	await process_frame
+	var startup_continue_game: Node = load("res://scenes/game.tscn").instantiate()
+	startup_continue_game.set("progress_save_path", "user://gameplay_save_ui_slot_1.json")
+	startup_continue_game.set("initial_mode", "continue")
+	root.add_child(startup_continue_game)
+	await process_frame
+	_check(startup_continue_game.get("hero_name") == "Slot Hero", "Continue should load the latest save, including a manual slot")
+	_check(startup_continue_game.call("_save_slot_path", 1) == "user://gameplay_save_ui_slot_2.json", "Continuing from a slot should preserve the save slot family")
+	startup_continue_game.queue_free()
+	await process_frame
 	save_ui_game.set("gold", 777)
 	save_ui_player.global_position = Vector2(1000, 500)
 	save_ui_game.get("save_slot_rows")[1].get_child(1).emit_signal("pressed")
@@ -666,6 +695,32 @@ func _run() -> void:
 	if FileAccess.file_exists(save_path):
 		var remove_error := DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
 		_check(remove_error == OK, "Test save file should be removed")
+
+	var auto_save_before := ""
+	var auto_save_file: FileAccess
+	if FileAccess.file_exists("user://greenvale_progress.json"):
+		auto_save_file = FileAccess.open("user://greenvale_progress.json", FileAccess.READ)
+		auto_save_before = auto_save_file.get_as_text()
+		auto_save_file.close()
+	var title_menu_return: Node = load("res://scenes/ui/main_menu.tscn").instantiate()
+	root.add_child(title_menu_return)
+	current_scene = title_menu_return
+	await process_frame
+	title_menu_return.call("_on_new_game_button")
+	await process_frame
+	var menu_started_game: Node = current_scene
+	_check(menu_started_game.get("initial_mode") == "new_game", "New Game should launch in the hero creation flow")
+	_check(menu_started_game.get("creation_layer").visible, "New Game should show hero creation from the title menu")
+	_check(menu_started_game.get("hero_creation_cancel_button").visible, "New Game should allow canceling to title")
+	menu_started_game.get("hero_creation_cancel_button").emit_signal("pressed")
+	await process_frame
+	_check(current_scene.get_script().resource_path == "res://scripts/ui/main_menu.gd", "Canceling hero creation should return to title")
+	var auto_save_after := ""
+	if FileAccess.file_exists("user://greenvale_progress.json"):
+		auto_save_file = FileAccess.open("user://greenvale_progress.json", FileAccess.READ)
+		auto_save_after = auto_save_file.get_as_text()
+		auto_save_file.close()
+	_check(auto_save_before == auto_save_after, "Canceling title-menu New Game should leave the existing auto-save unchanged")
 	quit(failures)
 
 func _check(condition: bool, message: String) -> void:
