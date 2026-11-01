@@ -1,6 +1,6 @@
-# Chrono Chronicles - FF6-Style RPG
+# Chrono Chronicles
 
-A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world exploration mechanics.
+A solo-hero, turn-based JRPG prototype built with Godot 4, inspired by classic JRPG exploration and combat.
 
 ## Current Playable Slice
 
@@ -16,6 +16,8 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - Earn gold for completing the quest; progress saves between sessions
 - The playable slice uses original pixel-style SVG artwork for the overworld, heroes, NPCs, buildings, and monsters
 - Original title, exploration, and battle chiptune loops play alongside combat effects; much of the interface and map markers remain code-drawn
+- The game is a focused vertical slice, not yet the larger party-based, multi-zone RPG described by the original design brief
+- Hero, NPC, building, tree, and monster artwork is static; animation, varied directional poses, and authored UI art have not been added
 
 ## How to Run
 
@@ -58,54 +60,47 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 
 ```
 3d_game/
-├── assets/              # Game assets (sprites, audio)
-│   ├── characters/     # Character sprites/models
-│   ├── environments/   # Overworld tiles, dungeon rooms
-│   ├── ui/             # UI elements
-│   └── audio/          # BGM, SFX
+├── assets/
+│   ├── art/             # Authored SVG artwork used by the Greenvale slice
+│   ├── audio/           # Original WAV music and sound effects
+│   ├── characters/      # Legacy import metadata; not the active slice artwork
+│   ├── environments/    # Legacy import metadata; not the active slice tileset
+│   └── ui/              # Legacy import metadata; current UI is mostly code-drawn
 ├── scenes/
-│   ├── main/           # Main game scene
-│   ├── combat/         # Battle scenes
-│   ├── overworld/      # Overworld map
-│   └── dungeons/       # Dungeon exploration
+│   ├── ui/main_menu.tscn
+│   ├── game.tscn        # Active Greenvale adventure
+│   ├── battle.tscn      # Battle UI used by the active slice
+│   ├── dungeons/        # Legacy dungeon prototype
+│   ├── combat/          # Legacy combat scenes
+│   └── autoloads/       # Legacy/general RPG system nodes
 ├── scripts/
-│   ├── game/           # Greenvale playable slice and generated pixel art
-│   ├── core/           # Base classes (Character, Equipment)
-│   ├── systems/        # Game systems (Combat, Save, etc.)
-│   │   ├── combat/     # Combat engine
-│   │   ├── overworld/  # Overworld navigation
-│   │   └── dungeons/   # Dungeon generation
-│   ├── main/           # Main game manager
-│   └── ui/             # UI controllers
+│   ├── game/            # Active Greenvale and battle logic
+│   ├── ui/              # Active title menu
+│   ├── autoloads/       # Shared audio director and asset manager
+│   ├── systems/         # Older standalone system prototypes
+│   ├── dungeons/        # Legacy dungeon scene
+│   └── core/            # General RPG classes, not an active party system
+├── tests/gameplay_smoke.gd
 ├── plans/              # Design documents
 └── project.godot       # Godot project file
 ```
 
 ## Next Recommended Milestone
 
-1. **Playtest and balance**: Check whether the map and journal make clue routes clear, and tune mixed-fight difficulty, class balance, and monster gold rewards
-2. **Complete the art pass**: Add animation, directional hero poses, richer environment variation, and authored UI assets while preserving the current gameplay layout
-3. **Expand the audio pass**: Add location ambience, exploration interactions, more battle feedback, and volume controls
-4. **Expand the world deliberately**: Build another connected location or party member only after the current quest-and-combat loop is fun
-5. **Prepare builds**: Add export presets and platform-specific testing after the content and controls stabilize
+1. **Stabilize the dungeon prototype before expanding it**: The legacy generator creates room data, but its `set_tile()` is a no-op and the dungeon scene does not render or constrain movement to generated corridors. Finish a complete, traversable dungeon before treating procedural generation as a game feature.
+2. **Playtest and balance Greenvale**: Check clue-route clarity, mixed-fight targeting and pacing, class differences, monster gold, and equipment prices.
+3. **Polish the presentation**: Add character animation, more environmental variation, authored UI elements, ambient audio, and independent music/effects volume controls.
+4. **Expand scope only after playtesting**: Add another connected location or party members only after the current solo-hero loop is consistently fun.
+5. **Prepare builds**: Add export presets and platform testing once controls, content, and presentation are stable.
 
 ## Technical Notes
 
-- Turn order calculated by `(ATK / DEF) * 100`
-- Elemental system: Fire, Ice, Lightning, Wind, Earth, Water
-- Status effects: Burn, Freeze, Shock, Poison, Sleep
-- Greenvale progress auto-saves to `user://greenvale_progress.json`; manual slots are stored alongside it as `user://greenvale_progress_slot_1.json` through `_slot_3.json`
-
-## Default Party
-
-| Class | Role | HP | ATK | DEF | MP | MAG |
-|-------|------|----|-----|-----|----|-----|
-| Warrior | Physical DPS | 120 | 15.0 | 8.0 | - | - |
-| Mage | Magic/Heal | 70 | - | 4.0 | 60 | 12.0 |
-| Thief | Utility | 65 | 12.0 | 5.0 | - | 8.0 |
-| Monk | Balanced | 90 | 14.0 | 7.0 | 30 | - |
+- The active slice controls one hero; Warrior, Mage, and Rogue are starting classes, not party members.
+- Greenvale progress auto-saves to `user://greenvale_progress.json`; manual slots use `user://greenvale_progress_slot_1.json` through `_slot_3.json`.
+- The audio preference is stored in `user://settings.cfg`.
 
 ## Known Issues
 
-- Greenvale's first-pass pixel art is generated in code; replace it with a hand-authored tileset and animations as art is added
-- The legacy dungeon and broader RPG systems are still prototypes and are not part of the current playable loop
+- The legacy dungeon scene and generator are not part of the active Greenvale loop; tile rendering is unimplemented and movement does not follow generated corridors.
+- Map markers, parts of the world dressing, and most interface styling are still created in code; current authored character and monster art is static.
+- The four-character party, multi-zone progression, full elemental/status-effect systems, mobile controls, and export setup remain design goals or separate prototypes, not complete active features.

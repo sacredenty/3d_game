@@ -11,21 +11,38 @@ Build a turn-based JRPG with FF6-inspired world exploration mechanics using Godo
 
 The current playable prototype covers a village/forest adventure with two connected quests and inspectable clues, followed by an optional hunter contract with two mixed encounters. Forest Shade, Bramble Wolf, Ashwing, Thornback, and Cave Sentinel have distinct stats, weaknesses, or combat behaviors; mixed battles support choosing a target and let each living enemy act. The Ashwing drains MP with Cinder bolt, while the Thornback's Shell guard reduces the next hit. The slice also includes optional potion/gold/XP discoveries, a healing campfire, NPC dialogue, saved progression, and hero creation with a name, class, and rerollable class-based stats. Warrior, Mage, and Rogue have distinct combat advantages. The village trader sells potions and equipment; a character-and-bag menu supports comparing and equipping one item in each of seven slots (weapon, body, head, arms, hands, legs, and feet), selling items at the trader, and dropping unwanted items. Equipped stats affect battle damage and defense. Completing the main adventure unlocks an optional cave with a warding Cave Sentinel and a permanent one-time treasure reward. The exploration HUD keeps the current objective and survival stats visible without the detailed equipment list. A Map / Journal screen (M) shows the player's position, known landmarks and quest destinations, plus active, completed, and upcoming objectives. This is a vertical-slice milestone, not completion of the broader phases below.
 
-**Current art/audio pass:** original pixel-style SVG art now covers the overworld tiles, hero classes, village NPCs and buildings, trees, and all current monsters. Original loopable chiptune themes distinguish the title menu, Greenvale, and battle, with effects for combat actions and victories. Interface, map markers, animation, and location ambience remain future polish.
+**Current art/audio pass:** original pixel-style SVG art now covers the overworld tiles, hero classes, village NPCs and buildings, trees, and all current monsters. Original loopable chiptune themes distinguish the title menu, Greenvale, and battle, with effects for combat actions and victories. The title menu and in-game controls can mute all audio, and that preference persists between sessions. Interface art, character animation, and location ambience remain future polish.
 
-**Recommended next step:** playtest the new art and sound in context, tune the optional-hunt pacing, mixed-encounter targeting, class balance, monster gold, and equipment economy, then expand the remaining art/audio polish before adding party or dungeon scope.
+**Recommended next step:** stabilize the legacy dungeon prototype before expanding its scope: it currently generates room metadata, but `set_tile()` does not render tiles and the dungeon scene does not constrain movement to generated corridors. Then playtest and balance the active Greenvale loop, and continue the art/audio polish before adding party or world scope.
+
+### Current Implementation Status (November 2026)
+
+| Area | Status |
+|---|---|
+| Title menu and save flow | Implemented: Continue, three-slot Load, New Game/hero creation, in-game Save/Load, and persistent audio mute preference |
+| Greenvale adventure | Playable vertical slice: one continuous village/forest map, linked main quests, optional hunter contract, cave encounter/reward, NPCs, clues, and healing |
+| Combat and progression | Implemented for one selected hero against single or mixed encounters, including class differences, enemy intent patterns, XP/levels, gold, equipment, and consumables |
+| Inventory and shop | Implemented in the active slice: seven equipment slots, item comparison, equip/discard, and buying/selling at Rowan's shop |
+| Map and journal | Implemented for the current Greenvale map and quest flow |
+| Art and audio | First authored pass implemented: static SVG art, three music themes, combat effects, and global On/Off toggle; animation, authored UI art, ambience, and separate volume controls remain |
+| Party-based RPG | Not implemented in the active game; the playable slice is single-hero, and the four-character party remains a design goal |
+| Multi-zone world | Not implemented as a connected zone system; the cave is an area in the current Greenvale map |
+| Procedural dungeon | Prototype only, not part of the active game loop; the generator's tile-writing method is empty and the legacy scene is not a complete rendered dungeon |
+| Builds and platform validation | Not prepared; no export presets or mobile-control validation |
+
+These are implementation-status notes, not completion claims for the broader design targets below. The legacy `core`, `systems`, and scene scripts are not automatically integrated into the active Greenvale slice.
 
 ---
 
-## Core Design Decisions
+## Original Core Design Targets
 
 ### Game Genre & Style
 - **Genre**: Classic Turn-Based RPG (FF6 style)
-- **Platform**: PC/Mobile hybrid (Godot 4 cross-platform)
+- **Platform target**: PC-first, with mobile support as a later goal; mobile controls and platform builds are not implemented
 - **Scope**: Solo developer - focused mechanics over content volume
-- **Visual Style**: Pixel art or low-poly 3D with retro aesthetic
+- **Visual Style target**: Pixel art with a retro aesthetic
 
-### Key Features (Prioritized for Solo Dev)
+### Long-Term Feature Targets (Prioritized for Solo Dev)
 1. **Overworld Exploration** - Grid-based movement between zones
 2. **Turn-Based Combat** - Menu-driven battles with elemental system
 3. **Party Management** - 4-character party (reduced from FF6's 6 for scope)
@@ -53,29 +70,39 @@ Export Targets: Windows, macOS, Linux, Android, iOS
 ```
 3d_game/
 ├── assets/
-│   ├── characters/       # Character sprites/models
-│   ├── environments/     # Overworld tiles, dungeon rooms
-│   ├── ui/               # Menus, HUD elements
-│   └── audio/            # BGM, SFX, voice lines
+│   ├── art/              # Active slice SVG artwork
+│   ├── audio/            # Active slice music and effects
+│   ├── characters/       # Legacy import metadata
+│   ├── environments/     # Legacy import metadata
+│   └── ui/               # Legacy import metadata; active UI is mostly code-drawn
 ├── scenes/
-│   ├── main/             # Game state management
-│   ├── characters/       # Character instances
-│   ├── combat/           # Battle system
-│   ├── overworld/        # Exploration scenes
-│   └── dungeons/         # Dungeon generation
+│   ├── ui/main_menu.tscn # Application entry scene
+│   ├── game.tscn         # Active Greenvale slice
+│   ├── battle.tscn       # Active slice battle
+│   ├── dungeons/         # Legacy dungeon prototype
+│   ├── combat/           # Legacy combat scenes
+│   └── autoloads/        # Shared/legacy system nodes
 ├── scripts/
-│   ├── core/             # Base classes, game logic
-│   ├── systems/          # Combat, inventory, progression
-│   └── ui/               # UI controllers
+│   ├── game/             # Active Greenvale and battle logic
+│   ├── ui/               # Active title menu
+│   ├── autoloads/        # Audio director and asset manager
+│   ├── systems/          # Standalone system prototypes
+│   ├── dungeons/         # Legacy dungeon scene
+│   └── core/             # General RPG classes, not an active party system
+├── tests/gameplay_smoke.gd
 └── plans/                # Design documents
 ```
 
 ---
 
-## Implementation Phases
+## Long-Term Implementation Phases
+
+The phases below describe the original target architecture. Use the current-status table above to distinguish those goals from features already present in the playable slice; several older scripts are prototypes rather than integrated systems.
 
 ### Phase 1: Core Systems (Foundation)
 **Goal**: Build reusable systems for all game features
+
+**Current status**: Partial. The active slice has solo-hero class stats, turn-based combat, inventory/equipment, and JSON save/load. A reusable four-character party, complete elemental/status-effect system, and integrated shared core systems are not implemented.
 
 #### Tasks:
 - [ ] **Character System**
@@ -101,6 +128,8 @@ Export Targets: Windows, macOS, Linux, Android, iOS
 ### Phase 2: Overworld Exploration
 **Goal**: Create the main gameplay loop
 
+**Current status**: Partial. The active game provides one continuous Greenvale village/forest map, NPC quests, clues, exploration rewards, and an optional cave area. Multiple connected zones, a world map transition system, and random step-based encounters are not implemented in the active slice.
+
 #### Tasks:
 - [ ] **Overworld Map**
   - Tile-based navigation system
@@ -120,6 +149,8 @@ Export Targets: Windows, macOS, Linux, Android, iOS
 ### Phase 3: Dungeon Generation
 **Goal**: Create replayable dungeon content
 
+**Current status**: Prototype only. The legacy generator produces room dictionaries, but `set_tile()` is a no-op, the dungeon scene does not render the generated layout, and player movement is only bounded by the rectangular grid rather than the generated corridors. This is not a playable dungeon.
+
 #### Tasks:
 - [ ] **Procedural Room Generator**
   - Corridor-based layout algorithm
@@ -135,6 +166,8 @@ Export Targets: Windows, macOS, Linux, Android, iOS
 
 ### Phase 4: Content & Polish
 **Goal**: Add content and refine gameplay
+
+**Current status**: In progress. Original static SVG art and original music/effects are used by the active slice. Animation, authored UI assets, location ambience, and accessibility/volume-mix controls remain future work.
 
 #### Tasks:
 - [ ] **Content Creation**
@@ -154,6 +187,8 @@ Export Targets: Windows, macOS, Linux, Android, iOS
 
 ### Phase 5: Testing & Launch Prep
 **Goal**: Ensure quality and prepare release
+
+**Current status**: Partial. A gameplay smoke-test script covers major slice flows, but this is not a complete playtest, platform-performance pass, or release build setup. No export presets are currently configured.
 
 #### Tasks:
 - [ ] **Bug Fixing**
@@ -288,24 +323,20 @@ var loot_table: Dictionary   # Items dropped with probabilities
 
 ---
 
-## Open Questions
+## Remaining Product Decisions
 
-1. **Art Style**: Pixel art vs low-poly 3D?
-   - *Recommendation*: Start with pixel art sprites for overworld/combat (easier to source/create)
-
-2. **Story Scope**: Minimal narrative vs full story?
-   - *Recommendation*: Minimal - brief zone descriptions and NPC dialogue only
-
-3. **Mobile Controls**: Touch-optimized or PC-first?
-   - *Recommendation*: PC-first with basic touch support for testing
+1. **Audio mixing**: The game currently supports a persisted global mute toggle. Decide whether independent music/effects sliders justify the UI and settings complexity.
+2. **Art scope**: The pixel style is established. Prioritize walk cycles and environmental variety before adding a much larger set of assets.
+3. **Platform scope**: Current controls are keyboard/mouse-oriented. Decide which platform(s) to validate before implementing touch controls or export presets.
 
 ---
 
 ## Next Steps
 
-1. Set up Godot 4 project structure
-2. Create character base class implementation
-3. Build combat system prototype
-4. Design first zone (village)
+1. Make the dungeon prototype a real playable space: render the generated rooms and corridors, constrain movement to floor tiles, and guarantee a reachable exit.
+2. Playtest Greenvale from New Game through the main quest and optional content; tune combat pacing, class identity, clue clarity, and shop/reward balance.
+3. Add character animation, environmental variation, UI art, location ambience, and separate music/effects volume controls.
+4. Revisit party management and additional zones only after the current vertical slice is validated.
+5. Add export presets and platform-specific testing when the feature set and controls are stable.
 
-**Estimated Timeline**: 8-12 weeks for MVP (depending on art/audio availability)
+The original MVP timeline is no longer a useful estimate because the project has since evolved into an iterative vertical slice; estimate remaining work after the dungeon and playtest scopes are defined.
