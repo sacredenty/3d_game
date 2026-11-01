@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[node name="Main" type="Node2D"]
+
+[node name="Label" type="Label" parent="."]
+text = "Test Label"
+position = Vector2(100, 100)

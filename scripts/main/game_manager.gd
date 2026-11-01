@@ -1,7 +1,5 @@
 extends Node
 
-class_name GameManager
-
 signal zone_changed(old_zone: String, new_zone: String)
 signal party_member_joined(member_name: String)
 signal party_member_left(member_name: String)

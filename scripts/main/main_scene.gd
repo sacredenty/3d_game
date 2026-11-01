@@ -4,7 +4,6 @@ var combat_ui = null
 var encounter_system = null
 var game_manager = null
 
-const KEY_ESCAPE = 65359
 const KEY_E = 69
 
 func _ready() -> void:

@@ -1,22 +1,24 @@
 extends Node
 
-class_name PartyManager
-
 const MAX_PARTY_SIZE = 4
 
-@onready var party: Array[Node] = []
+var party: Array[Character] = []
 var active_character_index: int = -1
 
-signal character_added(character: Node)
-signal character_removed(character: Node)
-signal active_character_changed(index: int, character: Node)
+signal character_added(character: Character)
+signal character_removed(character: Character)
+signal active_character_changed(index: int, character: Character)
 signal all_characters_dead()
 
-func add_character(char: Node) -> void:
+func add_character(char: Character) -> void:
 	if party.size() >= MAX_PARTY_SIZE:
 		push_warning("Party is full!")
 		return
 	
+	if party.has(char):
+		return
+	if char.get_parent() == null:
+		add_child(char)
 	party.append(char)
 	character_added.emit(char)
 	
@@ -30,9 +32,17 @@ func remove_character(index: int) -> void:
 	var removed = party[index]
 	party.remove_at(index)
 	character_removed.emit(removed)
+	if removed.get_parent() == self:
+		remove_child(removed)
+		removed.queue_free()
 	
-	if active_character_index >= party.size():
-		active_character_index = max(0, party.size() - 1)
+	if party.is_empty():
+		active_character_index = -1
+	elif active_character_index > index:
+		active_character_index -= 1
+	elif active_character_index == index:
+		active_character_index = mini(index, party.size() - 1)
+		active_character_changed.emit(active_character_index, party[active_character_index])
 
 func set_active_character(index: int) -> void:
 	if index < 0 or index >= party.size():
@@ -45,25 +55,28 @@ func set_active_character(index: int) -> void:
 	if old_char != new_char:
 		active_character_changed.emit(index, new_char)
 
-func get_active_character() -> Node:
+func get_active_character() -> Character:
 	if active_character_index < 0 or active_character_index >= party.size():
 		return null
 	return party[active_character_index]
 
 func is_alive(index: int = -1) -> bool:
-	var char_to_check = get_active_character() if index == -1 else party[index]
-	return char_to_check and char_to_check.get_isalive()
+	if index == -1:
+		index = active_character_index
+	if index < 0 or index >= party.size():
+		return false
+	return party[index].get_is_alive()
 
 func all_dead() -> bool:
 	for char in party:
-		if char and char.get_isalive():
+		if char.get_is_alive():
 			return false
 	return true
 
 func heal_all(amount: int) -> void:
 	for i in range(party.size()):
 		var char = party[i]
-		if char and char.get_isalive():
+		if char.get_is_alive():
 			char.heal(amount)
 
 # Serialization for save/load
@@ -77,10 +90,16 @@ func to_dict() -> Dictionary:
 	return result
 
 func from_dict(data: Dictionary) -> void:
-	active_character_index = data.get("active_character_index", -1)
+	for char in party:
+		if char.get_parent() == self:
+			remove_child(char)
+			char.free()
 	party.clear()
+	active_character_index = -1
 	
 	for char_data in data.get("characters", []):
-		var char = Character.new()
-		char.from_dict(char_data)
+		var char = Character.create_from_data(char_data)
 		add_character(char)
+
+	var saved_index: int = data.get("active_character_index", -1)
+	active_character_index = saved_index if saved_index >= 0 and saved_index < party.size() else (-1 if party.is_empty() else 0)

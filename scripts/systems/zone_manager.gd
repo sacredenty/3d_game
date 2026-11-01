@@ -1,7 +1,5 @@
 extends Node
 
-class_name ZoneManager
-
 signal zone_changed(old_zone: String, new_zone: String)
 
 var current_zone: String = "forest"

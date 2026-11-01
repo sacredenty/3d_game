@@ -2,17 +2,6 @@ extends Control
 
 class_name ActionMenu
 
-const KEY_A = 65
-const KEY_NUMPAD1 = 96
-const KEY_Z = 90
-const KEY_NUMPAD2 = 103
-const KEY_I = 73
-const KEY_NUMPAD3 = 108
-const KEY_G = 71
-const KEY_NUMPAD4 = 109
-const KEY_Q = 81
-const KEY_ESCAPE = 65359
-
 @onready var attack_button: Button = null
 @onready var magic_button: Button = null
 @onready var item_button: Button = null
@@ -20,6 +9,7 @@ const KEY_ESCAPE = 65359
 @onready var flee_button: Button = null
 
 var is_processing: bool = false
+@onready var combat_system = get_node_or_null("/root/CombatSystem")
 
 func _ready() -> void:
 	attack_button.pressed.connect(_on_attack_pressed)
@@ -34,13 +24,13 @@ func _input(event: InputEvent) -> void:
 	
 	if event is InputEventKey and event.pressed:
 		match event.keycode:
-			KEY_A, KEY_NUMPAD1:
+			KEY_A, KEY_KP_1:
 				execute_action("attack")
-			KEY_Z, KEY_NUMPAD2:
+			KEY_Z, KEY_KP_2:
 				execute_action("magic")
-			KEY_I, KEY_NUMPAD3:
+			KEY_I, KEY_KP_3:
 				execute_action("item")
-			KEY_G, KEY_NUMPAD4:
+			KEY_G, KEY_KP_4:
 				execute_action("guard")
 			KEY_Q, KEY_ESCAPE:
 				execute_action("flee")
@@ -62,33 +52,28 @@ func execute_action(action_name: String) -> void:
 
 func _on_attack_pressed() -> void:
 	is_processing = false
-	if CombatSystem != null and is_instance_valid(CombatSystem):
-		var combat = CombatSystem as CombatSystem
-		combat.execute_action(0)
+	if combat_system != null:
+		combat_system.execute_action(0)
 
 func _on_magic_pressed() -> void:
 	is_processing = false
-	if CombatSystem != null and is_instance_valid(CombatSystem):
-		var combat = CombatSystem as CombatSystem
-		combat.execute_action(1)
+	if combat_system != null:
+		combat_system.execute_action(1)
 
 func _on_item_pressed() -> void:
 	is_processing = false
-	if CombatSystem != null and is_instance_valid(CombatSystem):
-		var combat = CombatSystem as CombatSystem
-		combat.execute_action(2)
+	if combat_system != null:
+		combat_system.execute_action(2)
 
 func _on_guard_pressed() -> void:
 	is_processing = false
-	if CombatSystem != null and is_instance_valid(CombatSystem):
-		var combat = CombatSystem as CombatSystem
-		combat.execute_action(3)
+	if combat_system != null:
+		combat_system.execute_action(3)
 
 func _on_flee_pressed() -> void:
 	is_processing = false
-	if CombatSystem != null and is_instance_valid(CombatSystem):
-		var combat = CombatSystem as CombatSystem
-		combat.execute_action(4)
+	if combat_system != null:
+		combat_system.execute_action(4)
 
 func process_input() -> void:
 	pass

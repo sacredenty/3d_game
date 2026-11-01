@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/overworld/player_controller.gd" id="1_player"]
+
+[node name="Main" type="Node2D"]
+
+[node name="Player" type="CharacterBody2D" parent="."]
+position = Vector2(100, 100)
+collision_layer = 1
+collision_mask = 1
+script = ExtResource("1_player")
+
+[node name="Sprite" type="ColorRect" parent="Player"]
+size = Vector2(32, 32)
+color = Color(0.2, 0.8, 0.2, 1)
+offset_left = -16
+offset_top = -16

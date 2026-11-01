@@ -1,7 +1,5 @@
 extends Node
 
-class_name EncounterSystem
-
 const ENCOUNTER_CHANCE = 0.15  # 15% chance per step
 
 # ZoneManager is autoload, use directly
@@ -23,19 +21,21 @@ func trigger_random_encounter() -> bool:
 func get_random_enemies(count: int = 1) -> Array[Node]:
 	var enemy_names = ["slime", "rat", "wolf", "goblin", "bat", "orc", "golem", "skeleton", "dark mage", "dragon"]
 	
-	current_encounter.clear()
+	_clear_current_encounter()
 	for i in range(min(count, enemy_names.size())):
 		var enemy_name = enemy_names[randi() % enemy_names.size()]
-		var new_enemy = Node.new()
+		var new_enemy = Enemy.new()
 		setup_enemy(enemy_name, new_enemy)
+		add_child(new_enemy)
 		current_encounter.append(new_enemy)
 	
 	return current_encounter
 
-func setup_enemy(name: String, enemy: Node) -> void:
+func setup_enemy(name: String, enemy: Enemy) -> void:
 	match name.to_lower():
 		"slime":
 			enemy.name = "Slime"
+			enemy.enemy_type = "slime"
 			enemy.hp = 30.0
 			enemy.max_hp = 30.0
 			enemy.attack_power = 5.0
@@ -43,6 +43,7 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 1.0
 		"rat":
 			enemy.name = "Rat"
+			enemy.enemy_type = "rat"
 			enemy.hp = 20.0
 			enemy.max_hp = 20.0
 			enemy.attack_power = 4.0
@@ -50,6 +51,7 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 1.0
 		"wolf":
 			enemy.name = "Wolf"
+			enemy.enemy_type = "wolf"
 			enemy.hp = 50.0
 			enemy.max_hp = 50.0
 			enemy.attack_power = 8.0
@@ -57,6 +59,7 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 2.0
 		"goblin":
 			enemy.name = "Goblin"
+			enemy.enemy_type = "goblin"
 			enemy.hp = 35.0
 			enemy.max_hp = 35.0
 			enemy.attack_power = 6.0
@@ -64,6 +67,7 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 3.0
 		"bat":
 			enemy.name = "Bat"
+			enemy.enemy_type = "bat"
 			enemy.hp = 25.0
 			enemy.max_hp = 25.0
 			enemy.attack_power = 7.0
@@ -71,6 +75,7 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 4.0
 		"orc":
 			enemy.name = "Orc"
+			enemy.enemy_type = "orc"
 			enemy.hp = 80.0
 			enemy.max_hp = 80.0
 			enemy.attack_power = 12.0
@@ -78,6 +83,7 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 3.0
 		"golem":
 			enemy.name = "Golem"
+			enemy.enemy_type = "golem"
 			enemy.hp = 150.0
 			enemy.max_hp = 150.0
 			enemy.attack_power = 8.0
@@ -85,6 +91,7 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 1.0
 		"skeleton":
 			enemy.name = "Skeleton"
+			enemy.enemy_type = "skeleton"
 			enemy.hp = 40.0
 			enemy.max_hp = 40.0
 			enemy.attack_power = 9.0
@@ -92,6 +99,7 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 2.0
 		"dark mage":
 			enemy.name = "Dark Mage"
+			enemy.enemy_type = "dark mage"
 			enemy.hp = 60.0
 			enemy.max_hp = 60.0
 			enemy.attack_power = 4.0
@@ -99,11 +107,13 @@ func setup_enemy(name: String, enemy: Node) -> void:
 			enemy.magic_power = 15.0
 		"dragon":
 			enemy.name = "Dragon"
+			enemy.enemy_type = "dragon"
 			enemy.hp = 200.0
 			enemy.max_hp = 200.0
 			enemy.attack_power = 18.0
 			enemy.defense = 10.0
 			enemy.magic_power = 20.0
+	enemy.current_defense = enemy.defense
 
 func get_encounter_data() -> Array[Dictionary]:
 	var enemy_names = ["slime", "rat", "wolf", "goblin", "bat", "orc"]
@@ -170,5 +180,11 @@ func get_is_boss_encounter() -> bool:
 	return false
 
 func end_encounter(won: bool) -> void:
-	current_encounter.clear()
+	_clear_current_encounter()
 	encounter_ended.emit(won)
+
+func _clear_current_encounter() -> void:
+	for enemy in current_encounter:
+		if is_instance_valid(enemy) and enemy.get_parent() == self:
+			enemy.queue_free()
+	current_encounter.clear()

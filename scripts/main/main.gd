@@ -2,7 +2,7 @@ extends Node
 
 class_name Main
 
-@onready var game_manager: GameManager = null
+@onready var game_manager = null
 
 func _ready() -> void:
 	var main_scene = preload("res://scenes/main/main_scene.tscn")

@@ -25,12 +25,18 @@ func generate_dungeon() -> void:
 	rooms.append(start_room)
 	current_room = start_room
 	
-	# Generate rooms until we reach exit area
-	while not should_place_exit():
+	while not should_place_exit() and rooms.size() < dungeon_width * dungeon_height:
 		var next_room = get_next_room()
-		if next_room:
-			rooms.append(next_room)
-			current_room = next_room
+		if next_room.is_empty():
+			current_room["type"] = RoomType.EXIT
+			current_room["contents"] = ["exit"]
+			break
+		rooms.append(next_room)
+		current_room = next_room
+
+	if not should_place_exit():
+		current_room["type"] = RoomType.EXIT
+		current_room["contents"] = ["exit"]
 
 func create_room(room_type: RoomType, x: int, y: int) -> Dictionary:
 	var room = {
@@ -72,7 +78,7 @@ func get_next_room() -> Dictionary:
 			current_room = new_room
 			return new_room
 	
-	return null
+	return {}
 
 func can_place_room(x: int, y: int) -> bool:
 	if x < 0 or y < 0:
@@ -119,8 +125,10 @@ func get_random_room_type() -> RoomType:
 		return RoomType.BOSS
 
 func should_place_exit() -> bool:
-	var exit_rooms = [r for r in rooms if r["type"] == RoomType.EXIT]
-	return len(exit_rooms) > 0
+	for room in rooms:
+		if room["type"] == RoomType.EXIT:
+			return true
+	return false
 
 func create_corridor(x1: int, y1: int, x2: int, y2: int) -> void:
 	# Horizontal corridor first

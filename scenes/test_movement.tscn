@@ -1,6 +1,15 @@
-[gd_scene load_steps=2 format=3 uid="uid://testmov001"]
+[gd_scene load_steps=2 format=3 uid="uid://test_movement"]
 
-[ext_resource type="Script" path="res://scripts/test_movement.gd" id="1::test_mov"]
+[ext_resource type="Script" path="res://scripts/systems/overworld/player_controller.gd" id="1_player"]
 
-[node name="MovementTester" type="Node2D"]
-script = ExtResource("1::test_mov")
+[node name="Player" type="CharacterBody2D"]
+position = Vector2(400, 300)
+collision_layer = 1
+collision_mask = 1
+script = ExtResource("1_player")
+
+[node name="Sprite" type="ColorRect" parent="."]
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.2, 1)
+offset_left = -32
+offset_top = -32

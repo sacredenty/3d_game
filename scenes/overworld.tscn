@@ -1,0 +1,62 @@
+[gd_scene load_steps=3 format=3 uid="uid://overworld001"]
+
+[ext_resource type="Script" path="res://scripts/systems/overworld/overworld_map.gd" id="1_map"]
+[ext_resource type="Script" path="res://scripts/systems/overworld/player_controller.gd" id="2_player"]
+
+[node name="OverworldMap" type="Node2D"]
+script = ExtResource("1_map")
+
+[node name="Tile_0_0" type="ColorRect" parent="."]
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Tile_1_0" type="ColorRect" parent="."]
+position = Vector2(64, 0)
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Tile_2_0" type="ColorRect" parent="."]
+position = Vector2(128, 0)
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Tile_0_1" type="ColorRect" parent="."]
+position = Vector2(0, 64)
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Tile_1_1" type="ColorRect" parent="."]
+position = Vector2(64, 64)
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Tile_2_1" type="ColorRect" parent="."]
+position = Vector2(128, 64)
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Tile_0_2" type="ColorRect" parent="."]
+position = Vector2(0, 128)
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Tile_1_2" type="ColorRect" parent="."]
+position = Vector2(64, 128)
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Tile_2_2" type="ColorRect" parent="."]
+position = Vector2(128, 128)
+size = Vector2(64, 64)
+color = Color(0.2, 0.8, 0.3, 1)
+
+[node name="Player" type="CharacterBody2D" parent="."]
+position = Vector2(32, 96)
+script = ExtResource("2_player")
+
+[node name="Sprite" type="ColorRect" parent="Player"]
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 16.0
+offset_bottom = 16.0
+color = Color(1, 0.5, 0, 1)

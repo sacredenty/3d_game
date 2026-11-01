@@ -43,5 +43,6 @@ func transition_complete() -> void:
 		label.queue_free()
 	if progress_bar != null and is_instance_valid(progress_bar):
 		progress_bar.queue_free()
+	finished.emit()
 
 signal finished

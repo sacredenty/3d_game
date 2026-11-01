@@ -1,10 +1,9 @@
 extends Node
 
-class_name CombatSystem
-
 signal turn_changed(actor_name: String)
 signal battle_won()
 signal battle_lost()
+signal battle_fled()
 signal enemy_turn_started(enemy_name: String)
 signal player_turn_started(player_name: String)
 
@@ -130,7 +129,10 @@ func _on_flee_pressed() -> void:
 	if not is_combat_active or battle_ended:
 		return
 	
-	end_combat(true)
+	is_combat_active = false
+	battle_ended = true
+	battle_fled.emit()
+	print("Combat ended, player fled")
 
 func calculate_damage(action_type: String, enemy_defense: float) -> float:
 	var base_damage = 15.0 if action_type == "attack" else 20.0

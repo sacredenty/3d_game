@@ -1,7 +1,5 @@
 extends Node
 
-class_name ZoneManager
-
 @export_group("Zone Data")
 var zones: Dictionary = {
 	"village": {
@@ -31,7 +29,7 @@ var zones: Dictionary = {
 	"castle": {
 		"name": "Castle Ruins",
 		"description": "The crumbling remains of an ancient castle.",
-		"enemies": ["Skeleton3D", "Dark Mage", "Dragon"],
+		"enemies": ["Skeleton", "Dark Mage", "Dragon"],
 		"items": ["Sword", "Magic Scroll"],
 		"npcs": []
 	}

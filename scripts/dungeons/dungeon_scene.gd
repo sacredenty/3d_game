@@ -2,16 +2,6 @@ extends Control
 
 class_name DungeonScene
 
-const KEY_ESCAPE = 65359
-const KEY_w = 87
-const KEY_s = 83
-const KEY_a = 65
-const KEY_d = 68
-const KEY_UP = 38
-const KEY_DOWN = 40
-const KEY_LEFT = 37
-const KEY_RIGHT = 39
-
 @onready var dungeon_generator: DungeonGenerator = null
 
 var player_position: Vector2i = Vector2i(1, 1)
@@ -36,13 +26,13 @@ func handle_input(keycode: int) -> void:
 		KEY_ESCAPE:
 			get_tree().change_scene_to_packed(preload("res://scenes/main/main_scene.tscn"))
 		
-		KEY_w, KEY_UP:
+		KEY_W, KEY_UP:
 			move_player(0, -1)
-		KEY_s, KEY_DOWN:
+		KEY_S, KEY_DOWN:
 			move_player(0, 1)
-		KEY_a, KEY_LEFT:
+		KEY_A, KEY_LEFT:
 			move_player(-1, 0)
-		KEY_d, KEY_RIGHT:
+		KEY_D, KEY_RIGHT:
 			move_player(1, 0)
 
 func move_player(dx: int, dy: int) -> void:

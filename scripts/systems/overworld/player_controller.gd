@@ -1,31 +1,34 @@
 extends CharacterBody2D
 
 @export var move_speed: float = 100.0
-@export var tile_size: int = 32
-
-var overworld_map: OverworldMap = null
 
 func _ready() -> void:
-	overworld_map = get_node_or_null("../OverworldMap")
+	print("PlayerController ready at:", position.x, position.y)
 
-func _physics_process(delta: float) -> void:
-	var input_velocity = Vector2.ZERO
+func _physics_process(_delta: float) -> void:
+	var input_dir := Vector2.ZERO
 	
-	# Check for arrow keys and WASD
-	if Input.is_key_pressed(KEY_RIGHT):
-		input_velocity.x = move_speed * delta
-	elif Input.is_key_pressed(KEY_LEFT):
-		input_velocity.x = -move_speed * delta
+	if Input.is_action_pressed("move_right"):
+		input_dir.x += 1.0
+	if Input.is_action_pressed("move_left"):
+		input_dir.x -= 1.0
+	if Input.is_action_pressed("move_up"):
+		input_dir.y -= 1.0
+	if Input.is_action_pressed("move_down"):
+		input_dir.y += 1.0
 	
-	if Input.is_key_pressed(KEY_UP):
-		input_velocity.y = -move_speed * delta
-	elif Input.is_key_pressed(KEY_DOWN):
-		input_velocity.y = move_speed * delta
-	
-	velocity = input_velocity
+	if input_dir.length_squared() > 0.0:
+		input_dir = input_dir.normalized()
+		velocity = input_dir * move_speed
+	else:
+		velocity = Vector2.ZERO
+
 	move_and_slide()
 
-func _on_overworld_map_player_moved(new_position: Vector2i) -> void:
-	var target_x = new_position.x * tile_size + tile_size / 2
-	var target_y = new_position.y * tile_size + tile_size / 2
-	position = Vector2(target_x, target_y)
+func _input(event):
+	if event is InputEventKey and event.pressed:
+		match event.keycode:
+			KEY_W, KEY_UP: print("W/UP pressed at:", position.x, position.y)
+			KEY_S, KEY_DOWN: print("S/DOWN pressed at:", position.x, position.y)
+			KEY_A, KEY_LEFT: print("A/LEFT pressed at:", position.x, position.y)
+			KEY_D, KEY_RIGHT: print("D/RIGHT pressed at:", position.x, position.y)
