@@ -14,7 +14,8 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - Open the world map and quest journal with **M** or the HUD button; the map marks the player's position, village landmarks, current clues, and unlocked destinations, while the journal separates active, completed, and upcoming objectives
 - After restoring peace, explore an optional cave, face the Cave Sentinel's ward, and claim its one-time Crystal Heart reward
 - Earn gold for completing the quest; progress saves between sessions
-- Terrain and character pixel art are generated at runtime as placeholders until source art is added
+- The playable slice uses original pixel-style SVG artwork for the overworld, heroes, NPCs, buildings, and monsters
+- Original title, exploration, and battle chiptune loops play alongside combat effects; much of the interface and map markers remain code-drawn
 
 ## How to Run
 
@@ -27,6 +28,13 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - **Continue** resumes the latest updated adventure, including a save slot selected from Load Game, and is disabled when no save exists.
 - **Load Game** opens the three save slots and is disabled when no slot save exists.
 - **New Game** opens hero creation. The current save is not replaced until **Begin Adventure** is confirmed; canceling returns to the title menu.
+
+## Art and Audio
+
+- Original pixel-style SVG assets live in `assets/art/`; SVG sources are kept editable and use crisp pixel edges when rendered in game.
+- Original loopable chiptune themes and short combat effects live in `assets/audio/` as WAV files.
+- The title menu, Greenvale exploration, and combat use distinct music themes. Combat actions and victories trigger matching sound effects.
+- Use **Audio: On / Off** on the title menu or in-game controls to mute or restore all audio; the preference is saved between sessions.
 
 ## Controls
 
@@ -76,8 +84,8 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 ## Next Recommended Milestone
 
 1. **Playtest and balance**: Check whether the map and journal make clue routes clear, and tune mixed-fight difficulty, class balance, and monster gold rewards
-2. **Replace generated art**: Add authored hero, monster, environment, map, and UI assets while preserving the current gameplay layout
-3. **Add audio**: Give Greenvale, exploration clues, and each battle a distinct sound and music identity
+2. **Complete the art pass**: Add animation, directional hero poses, richer environment variation, and authored UI assets while preserving the current gameplay layout
+3. **Expand the audio pass**: Add location ambience, exploration interactions, more battle feedback, and volume controls
 4. **Expand the world deliberately**: Build another connected location or party member only after the current quest-and-combat loop is fun
 5. **Prepare builds**: Add export presets and platform-specific testing after the content and controls stabilize
 

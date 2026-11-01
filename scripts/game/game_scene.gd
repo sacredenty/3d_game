@@ -211,6 +211,7 @@ var map_tab_button: Button
 var journal_tab_button: Button
 
 func _ready() -> void:
+	AudioDirector.play_greenvale_theme()
 	save_slot_prefix = progress_save_path.get_basename()
 	for slot_index in range(SAVE_SLOT_COUNT):
 		var slot_suffix := "_slot_%d" % (slot_index + 1)
@@ -325,14 +326,8 @@ func _add_circle_obstacle(position: Vector2, radius: float) -> void:
 	add_child(body)
 
 func _make_world_tileset() -> TileSet:
-	var atlas_image := Image.create(128, 64, false, Image.FORMAT_RGBA8)
-	atlas_image.fill(Color.TRANSPARENT)
-	for row in range(2):
-		for column in range(4):
-			_draw_ground_tile(atlas_image, Vector2i(column * TILE_SIZE, row * TILE_SIZE), column, row)
-	var atlas_texture := ImageTexture.create_from_image(atlas_image)
 	var atlas_source := TileSetAtlasSource.new()
-	atlas_source.texture = atlas_texture
+	atlas_source.texture = _load_art_texture("overworld_atlas")
 	atlas_source.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
 	for y in range(2):
 		for x in range(4):
@@ -342,38 +337,11 @@ func _make_world_tileset() -> TileSet:
 	tile_set.add_source(atlas_source, 0)
 	return tile_set
 
-func _draw_ground_tile(image: Image, origin: Vector2i, column: int, row: int) -> void:
-	var base_colors: Array[Color] = [
-		Color("81995a"), Color("536f49"), Color("849c5b"), Color("bca071"),
-		Color("a98b60"), Color("77745b"), Color("758652"), Color("455f45")
-	]
-	var tile_index := row * 4 + column
-	var base := base_colors[tile_index]
-	image.fill_rect(Rect2i(origin, Vector2i(TILE_SIZE, TILE_SIZE)), base)
-	var shade := base.darkened(0.13)
-	var light := base.lightened(0.12)
-	for pixel in range(0, TILE_SIZE, 8):
-		image.fill_rect(Rect2i(origin + Vector2i(pixel, 0), Vector2i(1, TILE_SIZE)), shade)
-		image.fill_rect(Rect2i(origin + Vector2i(0, pixel), Vector2i(TILE_SIZE, 1)), shade)
-	match tile_index:
-		0, 1, 6, 7:
-			image.fill_rect(Rect2i(origin + Vector2i(6, 7), Vector2i(3, 2)), light)
-			image.fill_rect(Rect2i(origin + Vector2i(21, 20), Vector2i(2, 3)), shade)
-			image.fill_rect(Rect2i(origin + Vector2i(13, 26), Vector2i(2, 2)), light)
-		2:
-			_pixel(image, origin.x + 7, origin.y + 10, 3, 3, Color("f1d27a"))
-			_pixel(image, origin.x + 6, origin.y + 8, 1, 2, Color("456d43"))
-			_pixel(image, origin.x + 21, origin.y + 24, 3, 3, Color("e6a8a0"))
-			_pixel(image, origin.x + 22, origin.y + 22, 1, 2, Color("456d43"))
-		3, 4:
-			image.fill_rect(Rect2i(origin + Vector2i(4, 8), Vector2i(5, 2)), light)
-			image.fill_rect(Rect2i(origin + Vector2i(20, 23), Vector2i(4, 2)), shade)
-			image.fill_rect(Rect2i(origin + Vector2i(14, 14), Vector2i(2, 2)), Color("d1b987"))
-		5:
-			image.fill_rect(Rect2i(origin + Vector2i(3, 5), Vector2i(26, 22)), Color("8b795f"))
-			for seam in range(8, TILE_SIZE, 8):
-				image.fill_rect(Rect2i(origin + Vector2i(seam, 5), Vector2i(1, 22)), Color("685c4b"))
-			image.fill_rect(Rect2i(origin + Vector2i(3, 15), Vector2i(26, 1)), Color("685c4b"))
+func _load_art_texture(asset_name: String) -> Texture2D:
+	var texture := load("res://assets/art/%s.svg" % asset_name) as Texture2D
+	if texture == null:
+		push_error("Could not load art asset: %s" % asset_name)
+	return texture
 
 func _pixel(image: Image, x: int, y: int, width: int, height: int, color: Color) -> void:
 	image.fill_rect(Rect2i(x, y, width, height), color)
@@ -422,19 +390,7 @@ func _add_tree(position: Vector2) -> void:
 	add_child(body)
 
 func _make_tree_texture() -> Texture2D:
-	var image := Image.create(48, 64, false, Image.FORMAT_RGBA8)
-	image.fill(Color.TRANSPARENT)
-	_pixel(image, 20, 37, 9, 23, Color("63452f"))
-	_pixel(image, 18, 55, 13, 4, Color("4a382c"))
-	_pixel(image, 9, 22, 28, 23, Color("294c37"))
-	_pixel(image, 4, 27, 15, 20, Color("356344"))
-	_pixel(image, 28, 24, 16, 22, Color("3c7049"))
-	_pixel(image, 13, 11, 23, 24, Color("3d754a"))
-	_pixel(image, 18, 5, 14, 15, Color("548250"))
-	_pixel(image, 11, 22, 7, 7, Color("679357"))
-	_pixel(image, 29, 18, 6, 6, Color("6b9657"))
-	_pixel(image, 7, 33, 6, 5, Color("477c4d"))
-	return ImageTexture.create_from_image(image)
+	return _load_art_texture("tree")
 
 func _add_world_marker(position: Vector2, marker: String) -> void:
 	var sprite := Sprite2D.new()
@@ -500,51 +456,13 @@ func _make_marker_texture(marker: String) -> Texture2D:
 			_pixel(image, 3, 21, 18, 3, Color("a89a76"))
 	return ImageTexture.create_from_image(image)
 
-func _add_house(position: Vector2, roof_color: Color, wall_color: Color) -> void:
+func _add_house(position: Vector2, _roof_color: Color, _wall_color: Color) -> void:
 	var sprite := Sprite2D.new()
-	sprite.texture = _make_house_texture(roof_color, wall_color)
+	sprite.texture = _load_art_texture("village_shop" if position.x > 300.0 else "village_house")
 	sprite.position = position + Vector2(0, -20)
 	sprite.z_index = 1
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(sprite)
-
-func _make_house_texture(roof_color: Color, wall_color: Color) -> Texture2D:
-	var image := Image.create(96, 80, false, Image.FORMAT_RGBA8)
-	image.fill(Color.TRANSPARENT)
-	_pixel(image, 8, 28, 80, 48, Color("473d34"))
-	_pixel(image, 12, 31, 72, 45, wall_color)
-	_pixel(image, 4, 25, 88, 8, roof_color.darkened(0.28))
-	for row in range(5):
-		var inset := row * 7
-		_pixel(image, 10 + inset, 8 + row * 5, 76 - inset * 2, 7, roof_color)
-		_pixel(image, 10 + inset, 14 + row * 5, 76 - inset * 2, 1, roof_color.lightened(0.15))
-	_pixel(image, 22, 52, 18, 24, Color("644333"))
-	_pixel(image, 24, 54, 14, 22, Color("825a3c"))
-	_pixel(image, 59, 39, 19, 17, Color("527679"))
-	_pixel(image, 58, 38, 21, 2, Color("f0dfb0"))
-	_pixel(image, 67, 38, 2, 18, Color("f0dfb0"))
-	_pixel(image, 12, 74, 72, 3, Color("8e704f"))
-	return ImageTexture.create_from_image(image)
-
-func _make_character_texture(coat: Color, hair: Color, trim: Color) -> Texture2D:
-	var image := Image.create(24, 32, false, Image.FORMAT_RGBA8)
-	image.fill(Color.TRANSPARENT)
-	_pixel(image, 7, 2, 10, 2, hair.darkened(0.2))
-	_pixel(image, 5, 4, 14, 6, hair)
-	_pixel(image, 7, 10, 10, 7, Color("e7bd91"))
-	_pixel(image, 6, 9, 12, 3, hair)
-	_pixel(image, 8, 13, 2, 2, Color("453932"))
-	_pixel(image, 15, 13, 2, 2, Color("453932"))
-	_pixel(image, 5, 17, 14, 9, coat.darkened(0.18))
-	_pixel(image, 7, 17, 10, 8, coat)
-	_pixel(image, 9, 18, 6, 6, trim)
-	_pixel(image, 3, 19, 4, 7, coat)
-	_pixel(image, 17, 19, 4, 7, coat)
-	_pixel(image, 6, 26, 5, 5, Color("474b5c"))
-	_pixel(image, 13, 26, 5, 5, Color("474b5c"))
-	_pixel(image, 5, 30, 7, 2, Color("433a34"))
-	_pixel(image, 12, 30, 7, 2, Color("433a34"))
-	return ImageTexture.create_from_image(image)
 
 func _build_player() -> void:
 	player = CharacterBody2D.new()
@@ -562,7 +480,7 @@ func _build_player() -> void:
 
 	var sprite := Sprite2D.new()
 	sprite.name = "CharacterSprite"
-	sprite.texture = _make_character_texture(Color("b78c45"), Color("594333"), Color("e5cf86"))
+	sprite.texture = _load_art_texture("hero_warrior")
 	sprite.position.y = -22.0
 	sprite.scale = Vector2(1.5, 1.5)
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -582,21 +500,10 @@ func _build_player() -> void:
 func _update_player_appearance() -> void:
 	if player == null:
 		return
-	var coat := Color("b78c45")
-	var hair := Color("594333")
-	var trim := Color("e5cf86")
-	match hero_class:
-		"Mage":
-			coat = Color("536f91")
-			hair = Color("4a3b37")
-			trim = Color("9bc8dd")
-		"Rogue":
-			coat = Color("55734e")
-			hair = Color("3b332b")
-			trim = Color("c2b16d")
+	var hero_art := "hero_mage" if hero_class == "Mage" else "hero_rogue" if hero_class == "Rogue" else "hero_warrior"
 	var sprite := player.get_node_or_null("CharacterSprite") as Sprite2D
 	if sprite != null:
-		sprite.texture = _make_character_texture(coat, hair, trim)
+		sprite.texture = _load_art_texture(hero_art)
 
 func _build_npc() -> void:
 	npc = StaticBody2D.new()
@@ -610,7 +517,7 @@ func _build_npc() -> void:
 	npc.add_child(collision)
 	var sprite := Sprite2D.new()
 	sprite.name = "CharacterSprite"
-	sprite.texture = _make_character_texture(Color("577f91"), Color("5b4038"), Color("d7b06e"))
+	sprite.texture = _load_art_texture("mira")
 	sprite.position.y = -22.0
 	sprite.scale = Vector2(1.5, 1.5)
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -628,7 +535,7 @@ func _build_npc() -> void:
 	merchant.add_child(merchant_collision)
 	var merchant_sprite := Sprite2D.new()
 	merchant_sprite.name = "CharacterSprite"
-	merchant_sprite.texture = _make_character_texture(Color("a77b48"), Color("473d37"), Color("e2c36d"))
+	merchant_sprite.texture = _load_art_texture("rowan")
 	merchant_sprite.position.y = -22.0
 	merchant_sprite.scale = Vector2(1.5, 1.5)
 	merchant_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -720,6 +627,11 @@ func _build_interface() -> void:
 	map_button.custom_minimum_size = Vector2(130, 32)
 	map_button.pressed.connect(_open_map_journal)
 	map_controls.add_child(map_button)
+	var audio_toggle_button := _make_button("")
+	audio_toggle_button.custom_minimum_size = Vector2(104, 32)
+	audio_toggle_button.pressed.connect(_toggle_audio)
+	map_controls.add_child(audio_toggle_button)
+	_update_audio_toggle_button(audio_toggle_button)
 
 	prompt_panel = _make_panel(screen, Rect2(310, 540, 340, 48))
 	prompt_label = _make_label("", 15, Color("fff0c8"))
@@ -751,6 +663,16 @@ func _build_interface() -> void:
 	_build_inventory_ui(screen)
 	_build_map_journal_ui(screen)
 	_update_hud()
+
+func _toggle_audio() -> void:
+	AudioDirector.toggle_audio()
+	for button in find_children("*", "Button", true, false):
+		if button.name == "AudioToggleButton":
+			_update_audio_toggle_button(button)
+
+func _update_audio_toggle_button(button: Button) -> void:
+	button.name = "AudioToggleButton"
+	button.text = "Audio: On" if AudioDirector.audio_enabled else "Audio: Off"
 
 func _build_hero_creation() -> void:
 	creation_layer = CanvasLayer.new()
@@ -2025,6 +1947,7 @@ func _on_battle_finished(
 	player_hp = hp
 	player_mp = mp
 	potions = potion_count
+	AudioDirector.play_greenvale_theme()
 	battle_active = false
 	player.set("movement_enabled", true)
 	if outcome == "victory":

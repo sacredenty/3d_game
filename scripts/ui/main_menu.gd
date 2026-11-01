@@ -9,9 +9,11 @@ const SAVE_SLOT_COUNT := 3
 var continue_button: Button
 var load_button: Button
 var new_game_button: Button
+var audio_toggle_button: Button
 var menu_status: Label
 
 func _ready() -> void:
+	AudioDirector.play_title_theme()
 	_build_menu()
 	_refresh_menu()
 
@@ -41,7 +43,7 @@ func _build_menu() -> void:
 	add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(460, 470)
+	panel.custom_minimum_size = Vector2(460, 520)
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color("24372f")
 	panel_style.border_color = Color("b99a69")
@@ -82,6 +84,10 @@ func _build_menu() -> void:
 	new_game_button.pressed.connect(_on_new_game_button)
 	content.add_child(new_game_button)
 
+	audio_toggle_button = _make_menu_button("")
+	audio_toggle_button.pressed.connect(_toggle_audio)
+	content.add_child(audio_toggle_button)
+
 	menu_status = _make_label("", 13, Color("f3d890"))
 	menu_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -90,6 +96,7 @@ func _build_menu() -> void:
 	var controls := _make_label("WASD / Arrows to move  ·  E to interact", 12, Color("aebdaf"))
 	controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(controls)
+	_refresh_audio_button()
 
 func _refresh_menu() -> void:
 	var latest_save := _latest_save_path()
@@ -155,6 +162,14 @@ func _on_load_pressed() -> void:
 func _on_new_game_button() -> void:
 	new_game_started.emit()
 	_launch_game("new_game")
+
+func _toggle_audio() -> void:
+	AudioDirector.toggle_audio()
+	_refresh_audio_button()
+
+func _refresh_audio_button() -> void:
+	if audio_toggle_button != null:
+		audio_toggle_button.text = "Audio: On" if AudioDirector.audio_enabled else "Audio: Off"
 
 func _launch_game(start_mode: String, save_path: String = AUTO_SAVE_PATH) -> void:
 	var game := GAME_SCENE.instantiate()

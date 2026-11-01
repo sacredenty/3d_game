@@ -15,6 +15,49 @@ func _run() -> void:
 	await process_frame
 
 	var player: CharacterBody2D = game.get("player")
+	var audio_director: Node = root.get_node("AudioDirector")
+	var audio_was_enabled: bool = audio_director.get("audio_enabled")
+	var audio_toggle_button := _find_button(
+		game, "Audio: On" if audio_was_enabled else "Audio: Off"
+	)
+	_check(audio_toggle_button != null, "The in-game controls should expose an audio toggle")
+	audio_toggle_button.emit_signal("pressed")
+	_check(
+		audio_director.get("audio_enabled") == (not audio_was_enabled),
+		"The in-game audio toggle should change the audio setting"
+	)
+	_check(
+		audio_toggle_button.text == ("Audio: Off" if audio_was_enabled else "Audio: On"),
+		"The in-game audio toggle label should reflect its state"
+	)
+	_check(
+		AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")) == audio_was_enabled,
+		"Turning audio off should mute the Master bus"
+	)
+	var audio_settings := ConfigFile.new()
+	_check(
+		audio_settings.load("user://settings.cfg") == OK
+			and audio_settings.get_value("audio", "enabled", not audio_was_enabled) == (not audio_was_enabled),
+		"The audio toggle should persist across game launches"
+	)
+	audio_toggle_button.emit_signal("pressed")
+	_check(
+		audio_director.get("audio_enabled") == audio_was_enabled,
+		"The audio setting should be restorable after toggling"
+	)
+	var terrain_atlas := game.get("world_tiles").tile_set.get_source(0) as TileSetAtlasSource
+	_check(
+		terrain_atlas.texture.resource_path == "res://assets/art/overworld_atlas.svg",
+		"Overworld tiles should use the authored terrain atlas"
+	)
+	_check(
+		game.get("npc").get_node("CharacterSprite").texture.resource_path == "res://assets/art/mira.svg",
+		"Village NPCs should use authored character artwork"
+	)
+	_check(
+		root.get_node("AudioDirector").get("current_theme") == "greenvale",
+		"Starting an adventure should play the exploration theme"
+	)
 	_check(game.get("creation_layer").visible, "A new game should begin with hero creation")
 	_check(game.get("hero_creation_cancel_button").visible, "A title-menu new game should allow returning without saving")
 	_check(not FileAccess.file_exists(save_path), "Opening title-menu hero creation should not overwrite a save")
@@ -38,6 +81,10 @@ func _run() -> void:
 	_check(not game.get("creation_layer").visible, "Confirming hero creation should begin the adventure")
 	_check(game.get("hero_name") == "Ari", "The chosen hero name should be applied")
 	_check(game.get("hero_class") == "Warrior", "The chosen hero class should be applied")
+	_check(
+		player.get_node("CharacterSprite").texture.resource_path == "res://assets/art/hero_warrior.svg",
+		"Warrior creation should select the authored Warrior sprite"
+	)
 	var rolled_vitality: int = game.get("hero_vitality")
 	var rolled_strength: int = game.get("hero_strength")
 	var rolled_spirit: int = game.get("hero_spirit")
@@ -143,6 +190,14 @@ func _run() -> void:
 	game.call("_start_battle", "shade")
 	var shade_battle: Node = game.get("battle_instance")
 	_check(shade_battle.get("enemy_name") == "Forest Shade", "The first encounter should use the shade battle setup")
+	_check(
+		shade_battle.get("enemy_art").texture.resource_path == "res://assets/art/forest_shade.svg",
+		"Forest Shade battles should use the authored monster sprite"
+	)
+	_check(
+		root.get_node("AudioDirector").get("current_theme") == "battle",
+		"Starting a battle should switch to the battle theme"
+	)
 	_check(shade_battle.get("weakness") == "fire", "The shade should be weak to fire")
 	_check(shade_battle.get("intent_label").text == "Intent: Heavy strike", "The battle should telegraph the shade's heavy attack")
 	shade_battle.set("enemy_hp", 500)
@@ -174,6 +229,10 @@ func _run() -> void:
 	shade_battle.call("_finish", "victory")
 	shade_battle.result_button.emit_signal("pressed")
 	_check(not game.get("battle_active"), "Closing battle results should resume world movement")
+	_check(
+		root.get_node("AudioDirector").get("current_theme") == "greenvale",
+		"Returning from a battle should restore the exploration theme"
+	)
 	_check(game.get("quest_step") == 2, "Defeating the shade should lead back to Mira")
 	_check(game.get("player_experience") == 45, "Shade and discovery XP should carry over after leveling")
 	_check(game.get("gold") == 52, "Defeating the Forest Shade should grant its gold drop")
@@ -706,6 +765,21 @@ func _run() -> void:
 	root.add_child(title_menu_return)
 	current_scene = title_menu_return
 	await process_frame
+	_check(
+		root.get_node("AudioDirector").get("current_theme") == "title",
+		"Opening the title menu should play the title theme"
+	)
+	var title_audio_button := _find_button(
+		title_menu_return, "Audio: On" if audio_was_enabled else "Audio: Off"
+	)
+	_check(title_audio_button != null, "The title menu should expose the audio toggle")
+	if title_audio_button != null:
+		title_audio_button.emit_signal("pressed")
+		_check(
+			root.get_node("AudioDirector").get("audio_enabled") == (not audio_was_enabled),
+			"The title-menu audio toggle should change the global audio setting"
+		)
+		title_audio_button.emit_signal("pressed")
 	title_menu_return.call("_on_new_game_button")
 	await process_frame
 	var menu_started_game: Node = current_scene

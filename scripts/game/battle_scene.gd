@@ -112,6 +112,7 @@ func start_battle(
 	active = true
 	battle_outcome = ""
 	enemy_art.texture = _make_enemy_texture(enemy_color, enemy_name)
+	AudioDirector.play_battle_theme()
 	battle_title.text = "CAVE ENCOUNTER" if enemy_name == "Cave Sentinel" else "FOREST ENCOUNTER"
 	_update_ui()
 	battle_log.text = "Choose an action. Watch the enemy's intent."
@@ -280,6 +281,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _attack() -> void:
 	if not active:
 		return
+	AudioDirector.play_effect("attack")
 	var damage := randi_range(18, 25) + (hero_strength - 10) * 2 \
 		+ (player_level - 1) * 3 + weapon_attack_bonus
 	if hero_class == "Warrior":
@@ -292,6 +294,7 @@ func _attack() -> void:
 func _cast_magic() -> void:
 	if not active or player_mp < 8:
 		return
+	AudioDirector.play_effect("magic")
 	player_mp -= 8
 	var damage := 18 + hero_spirit * 2 + (player_level - 1) * 4 + weapon_magic_bonus
 	if hero_class == "Mage":
@@ -303,6 +306,7 @@ func _cast_magic() -> void:
 func _guard() -> void:
 	if not active:
 		return
+	AudioDirector.play_effect("hit")
 	guarding = true
 	_action_message("You guard against the next attack.")
 	_after_player_action()
@@ -311,6 +315,7 @@ func _use_potion() -> void:
 	var maximum_hp := 48 + hero_vitality * 4 + (player_level - 1) * 20
 	if not active or potions <= 0 or player_hp >= maximum_hp:
 		return
+	AudioDirector.play_effect("potion")
 	var restored := mini(35, maximum_hp - player_hp)
 	player_hp += restored
 	potions -= 1
@@ -320,6 +325,7 @@ func _use_potion() -> void:
 func _flee() -> void:
 	if not active:
 		return
+	AudioDirector.play_effect("hit")
 	active = false
 	battle_outcome = "flee"
 	actions.hide()
@@ -369,6 +375,7 @@ func _enemy_turn(foe_index: int) -> void:
 		battle_log.text += "\n%s uses %s, but you evade it!" % [foe_name, intent.to_lower()]
 	else:
 		player_hp = maxi(player_hp - damage, 0)
+		AudioDirector.play_effect("hit")
 		battle_log.text += "\n%s uses %s for %d damage." % [foe_name, intent.to_lower(), damage]
 		if intent == "Cinder bolt":
 			var drained_mp := mini(player_mp, 4)
@@ -380,6 +387,8 @@ func _enemy_turn(foe_index: int) -> void:
 func _finish(outcome: String) -> void:
 	active = false
 	battle_outcome = outcome
+	if outcome == "victory":
+		AudioDirector.play_effect("victory")
 	actions.hide()
 	match outcome:
 		"victory":
@@ -526,51 +535,18 @@ func _damage_enemy(base_damage: int, damage_kind: String, message_format: String
 func _dodge_chance() -> int:
 	return mini(hero_agility * 2, 40) if hero_class == "Rogue" else 0
 
-func _make_enemy_texture(color: Color, foe_name: String = "") -> Texture2D:
-	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	image.fill(Color.TRANSPARENT)
-	if foe_name == "Bramble Wolf":
-		image.fill_rect(Rect2i(4, 12, 19, 9), color)
-		image.fill_rect(Rect2i(18, 8, 10, 11), color.lightened(0.08))
-		image.fill_rect(Rect2i(24, 13, 7, 5), color.lightened(0.12))
-		image.fill_rect(Rect2i(19, 5, 4, 6), color.darkened(0.12))
-		image.fill_rect(Rect2i(25, 6, 4, 5), color.darkened(0.12))
-		image.fill_rect(Rect2i(6, 19, 4, 9), color.darkened(0.2))
-		image.fill_rect(Rect2i(15, 19, 4, 9), color.darkened(0.2))
-		image.fill_rect(Rect2i(23, 18, 4, 10), color.darkened(0.2))
-		image.fill_rect(Rect2i(2, 11, 5, 3), color.darkened(0.15))
-		image.fill_rect(Rect2i(24, 11, 2, 2), Color("fff3bf"))
-		return ImageTexture.create_from_image(image)
-	if foe_name == "Ashwing":
-		image.fill_rect(Rect2i(12, 10, 9, 13), color)
-		image.fill_rect(Rect2i(5, 6, 9, 7), color.lightened(0.18))
-		image.fill_rect(Rect2i(19, 6, 9, 7), color.lightened(0.18))
-		image.fill_rect(Rect2i(2, 4, 8, 3), Color("f0b956"))
-		image.fill_rect(Rect2i(23, 4, 7, 3), Color("f0b956"))
-		image.fill_rect(Rect2i(14, 14, 2, 2), Color("fff0b0"))
-		image.fill_rect(Rect2i(20, 14, 2, 2), Color("fff0b0"))
-		image.fill_rect(Rect2i(13, 23, 3, 6), color.darkened(0.2))
-		image.fill_rect(Rect2i(18, 23, 3, 6), color.darkened(0.2))
-		return ImageTexture.create_from_image(image)
-	if foe_name == "Thornback":
-		image.fill_rect(Rect2i(5, 12, 22, 14), color.darkened(0.15))
-		image.fill_rect(Rect2i(8, 8, 17, 15), color)
-		for spike_x in [7, 13, 19, 25]:
-			image.fill_rect(Rect2i(spike_x, 5, 3, 8), color.lightened(0.2))
-		image.fill_rect(Rect2i(12, 15, 3, 3), Color("fff0b0"))
-		image.fill_rect(Rect2i(21, 15, 3, 3), Color("fff0b0"))
-		image.fill_rect(Rect2i(7, 24, 4, 5), color.darkened(0.3))
-		image.fill_rect(Rect2i(22, 24, 4, 5), color.darkened(0.3))
-		return ImageTexture.create_from_image(image)
-	image.fill_rect(Rect2i(5, 6, 22, 18), color.darkened(0.18))
-	image.fill_rect(Rect2i(8, 3, 16, 20), color)
-	image.fill_rect(Rect2i(3, 12, 6, 10), color.darkened(0.1))
-	image.fill_rect(Rect2i(23, 10, 6, 12), color.darkened(0.1))
-	image.fill_rect(Rect2i(9, 21, 14, 6), color.darkened(0.3))
-	image.fill_rect(Rect2i(10, 12, 4, 3), Color("f3d987"))
-	image.fill_rect(Rect2i(19, 12, 4, 3), Color("f3d987"))
-	image.fill_rect(Rect2i(11, 13, 2, 2), Color("fff3bf"))
-	image.fill_rect(Rect2i(20, 13, 2, 2), Color("fff3bf"))
-	image.fill_rect(Rect2i(9, 27, 4, 4), color.lightened(0.15))
-	image.fill_rect(Rect2i(19, 27, 4, 4), color.lightened(0.15))
-	return ImageTexture.create_from_image(image)
+func _make_enemy_texture(_color: Color, foe_name: String = "") -> Texture2D:
+	var asset_name := "forest_shade"
+	match foe_name:
+		"Bramble Wolf":
+			asset_name = "bramble_wolf"
+		"Ashwing":
+			asset_name = "ashwing"
+		"Thornback":
+			asset_name = "thornback"
+		"Cave Sentinel":
+			asset_name = "cave_sentinel"
+	var texture := load("res://assets/art/%s.svg" % asset_name) as Texture2D
+	if texture == null:
+		push_error("Could not load enemy artwork for %s" % foe_name)
+	return texture

@@ -21,6 +21,7 @@ display_name="Chrono Chronicles - FF6 Style RPG"
 
 [autoload]
 
+AudioDirector="*res://scripts/autoloads/audio_director.gd"
 GameManager="*res://scenes/autoloads/game_manager.tscn"
 CombatSystem="*res://scenes/autoloads/combat_system.tscn"
 PartyManager="*res://scenes/autoloads/party_manager.tscn"
