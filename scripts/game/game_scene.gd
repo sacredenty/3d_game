@@ -941,8 +941,8 @@ func _build_shop_ui(screen: Control) -> void:
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 18)
 	content.add_child(columns)
-	shop_catalog_list = _make_shop_list(columns, "For Sale")
-	shop_inventory_list = _make_shop_list(columns, "Your Inventory")
+	shop_catalog_list = _make_shop_list(columns, "BUY  ·  Rowan's Stock")
+	shop_inventory_list = _make_shop_list(columns, "SELL  ·  Your Items")
 	var close_button := _make_button("Leave Shop")
 	close_button.custom_minimum_size = Vector2(220, 38)
 	close_button.pressed.connect(_close_shop)
@@ -969,7 +969,7 @@ func _build_inventory_ui(screen: Control) -> void:
 	inventory_title = _make_label("", 22, Color("f4e3b8"))
 	inventory_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(inventory_title)
-	inventory_status = _make_label("Gold: %d G  ·  Sell items to Rowan; drop unused gear here." % gold, 14, Color("f3d890"))
+	inventory_status = _make_label("Equip gear or discard extras here. Sell items only at Rowan.", 14, Color("f3d890"))
 	inventory_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(inventory_status)
 	var columns := HBoxContainer.new()
@@ -1005,7 +1005,7 @@ func _open_inventory() -> void:
 		return
 	player.set("movement_enabled", false)
 	inventory_title.text = "%s  ·  CHARACTER & BAG" % hero_name
-	inventory_status.text = "Gold: %d G  ·  Sell at Rowan, or drop items from your bag." % gold
+	inventory_status.text = "Equip gear or discard extras here. Sell items only at Rowan.  ·  Gold: %d G" % gold
 	_refresh_inventory_ui()
 	inventory_layer.show()
 
@@ -1042,15 +1042,10 @@ func _refresh_inventory_ui() -> void:
 		var potion_details := _make_label("Potion ×%d\nRestores HP during battle." % potions, 13, Color("e8eddb"))
 		potion_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		potion_row.add_child(potion_details)
-		var sell_potion := _make_button("Sell 10 G")
-		sell_potion.custom_minimum_size = Vector2(92, 32)
-		sell_potion.disabled = not _near_merchant()
-		sell_potion.pressed.connect(_sell_shop_item.bind("Potion"))
-		potion_row.add_child(sell_potion)
-		var drop_potion := _make_button("Drop 1")
-		drop_potion.custom_minimum_size = Vector2(76, 32)
-		drop_potion.pressed.connect(_drop_item.bind("Potion"))
-		potion_row.add_child(drop_potion)
+		var discard_potion := _make_button("Discard 1")
+		discard_potion.custom_minimum_size = Vector2(100, 32)
+		discard_potion.pressed.connect(_drop_item.bind("Potion"))
+		potion_row.add_child(discard_potion)
 
 	var listed_items: Dictionary = {}
 	for item_name in equipment_inventory:
@@ -1062,30 +1057,26 @@ func _refresh_inventory_ui() -> void:
 		var row := VBoxContainer.new()
 		row.add_theme_constant_override("separation", 2)
 		inventory_bag_list.add_child(row)
+		var is_equipped: bool = equipped_slots[slot] == item_name
 		var details := _make_label("%s  ·  %s ×%d%s\n%s\n%s" % [
 			EQUIPMENT_SLOT_LABELS[slot], item_name, equipment_inventory.count(item_name),
-			"  (Equipped)" if equipped_slots[slot] == item_name else "",
+			"  ·  EQUIPPED" if is_equipped else "",
 			item["description"], _compare_equipment(item_name)
 		], 13, Color("e8eddb"))
 		details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		row.add_child(details)
 		var buttons := HBoxContainer.new()
 		row.add_child(buttons)
-		if equipped_slots[slot] != item_name:
-			var equip_button := _make_button("Equip")
-			equip_button.custom_minimum_size = Vector2(78, 32)
+		if not is_equipped:
+			var equip_button := _make_button("Equip: %s" % EQUIPMENT_SLOT_LABELS[slot])
+			equip_button.custom_minimum_size = Vector2(136, 32)
 			equip_button.pressed.connect(_equip_item.bind(item_name))
 			buttons.add_child(equip_button)
-		var sell_button := _make_button("Sell %d G" % item["sell_price"])
-		sell_button.custom_minimum_size = Vector2(96, 32)
-		sell_button.disabled = not _near_merchant() or not _can_sell_equipment(item_name)
-		sell_button.pressed.connect(_sell_shop_item.bind(item_name))
-		buttons.add_child(sell_button)
-		var drop_button := _make_button("Drop 1")
-		drop_button.custom_minimum_size = Vector2(76, 32)
-		drop_button.disabled = not _can_drop_equipment(item_name)
-		drop_button.pressed.connect(_drop_item.bind(item_name))
-		buttons.add_child(drop_button)
+		var discard_button := _make_button("Discard 1")
+		discard_button.custom_minimum_size = Vector2(100, 32)
+		discard_button.disabled = not _can_drop_equipment(item_name)
+		discard_button.pressed.connect(_drop_item.bind(item_name))
+		buttons.add_child(discard_button)
 
 func _clear_list(item_list: VBoxContainer) -> void:
 	for child in item_list.get_children():
@@ -1106,7 +1097,7 @@ func _compare_equipment(item_name: String) -> String:
 	var slot: String = item["type"]
 	var current_name: String = equipped_slots[slot]
 	var current: Dictionary = ITEM_CATALOG[current_name] if not current_name.is_empty() else {}
-	return "Compared with %s: Phys %+d  Ember %+d  Def %+d" % [
+	return "Compared with %s: Attack %+d  Ember %+d  Defense %+d" % [
 		current_name if not current_name.is_empty() else "Empty",
 		int(item["attack"]) - int(current.get("attack", 0)),
 		int(item["magic"]) - int(current.get("magic", 0)),
@@ -1163,7 +1154,7 @@ func _open_shop() -> void:
 		or player.global_position.distance_to(merchant.global_position) >= 76.0:
 		return
 	player.set("movement_enabled", false)
-	shop_status.text = "Gold: %d G" % gold
+	shop_status.text = "Gold: %d G  ·  Buy from stock; sell items from your inventory." % gold
 	_refresh_shop_ui()
 	shop_layer.show()
 
@@ -1188,8 +1179,8 @@ func _refresh_shop_ui() -> void:
 		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		row.add_child(details)
-		var buy_button := _make_button("Buy")
-		buy_button.custom_minimum_size = Vector2(76, 36)
+		var buy_button := _make_button("Buy %d G" % item["price"])
+		buy_button.custom_minimum_size = Vector2(104, 36)
 		buy_button.disabled = gold < int(item["price"])
 		buy_button.pressed.connect(_buy_shop_item.bind(item_name))
 		row.add_child(buy_button)
@@ -1200,14 +1191,10 @@ func _refresh_shop_ui() -> void:
 		var potion_details := _make_label("Potion ×%d\nRestores HP in battle." % potions, 13, Color("e8eddb"))
 		potion_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		potion_row.add_child(potion_details)
-		var sell_potion := _make_button("Sell 10 G")
+		var sell_potion := _make_button("Sell +10 G")
 		sell_potion.custom_minimum_size = Vector2(100, 36)
 		sell_potion.pressed.connect(_sell_shop_item.bind("Potion"))
 		potion_row.add_child(sell_potion)
-		var drop_potion := _make_button("Drop 1")
-		drop_potion.custom_minimum_size = Vector2(76, 36)
-		drop_potion.pressed.connect(_drop_item.bind("Potion"))
-		potion_row.add_child(drop_potion)
 
 	var listed_equipment: Dictionary = {}
 	for item_name in equipment_inventory:
@@ -1218,31 +1205,22 @@ func _refresh_shop_ui() -> void:
 		var slot: String = item["type"]
 		var is_equipped: bool = equipped_slots.get(slot, "") == item_name
 		var owned_count := equipment_inventory.count(item_name)
-		var equipped_count := int(equipped_slots.get(slot, "") == item_name)
+		var can_sell := _can_sell_equipment(item_name)
 		var row := HBoxContainer.new()
 		shop_inventory_list.add_child(row)
+		var sale_note: String = "Equipped; keep at least one." if not can_sell else str(item["description"])
 		var details := _make_label("%s  ·  %s ×%d%s\n%s" % [
 			EQUIPMENT_SLOT_LABELS[slot], item_name, owned_count,
-			"  (Equipped)" if is_equipped else "", item["description"]
+			"  ·  EQUIPPED" if is_equipped else "", sale_note
 		], 13, Color("e8eddb"))
 		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		row.add_child(details)
-		var equip_button := _make_button("Equipped" if is_equipped else "Equip")
-		equip_button.custom_minimum_size = Vector2(88, 36)
-		equip_button.disabled = is_equipped
-		equip_button.pressed.connect(_equip_item.bind(item_name))
-		row.add_child(equip_button)
-		var sell_button := _make_button("Sell %d G" % item["sell_price"])
-		sell_button.custom_minimum_size = Vector2(100, 36)
-		sell_button.disabled = owned_count <= equipped_count or int(item["sell_price"]) <= 0
+		var sell_button := _make_button("Sell +%d G" % item["sell_price"])
+		sell_button.custom_minimum_size = Vector2(112, 36)
+		sell_button.disabled = not can_sell
 		sell_button.pressed.connect(_sell_shop_item.bind(item_name))
 		row.add_child(sell_button)
-		var drop_button := _make_button("Drop 1")
-		drop_button.custom_minimum_size = Vector2(76, 36)
-		drop_button.disabled = not _can_drop_equipment(item_name)
-		drop_button.pressed.connect(_drop_item.bind(item_name))
-		row.add_child(drop_button)
 
 func _buy_shop_item(item_name: String) -> void:
 	if not SHOP_ITEMS.has(item_name):

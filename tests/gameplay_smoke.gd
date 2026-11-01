@@ -513,9 +513,19 @@ func _run() -> void:
 	save_ui_game.call("_unhandled_input", trade_event)
 	_check(save_ui_game.get("shop_layer").visible, "Interacting with Rowan should open the shop")
 	_check(not save_ui_player.get("movement_enabled"), "The shop should pause player movement")
+	_check(
+		save_ui_game.get("shop_catalog_list").get_parent().get_parent().get_child(0).text == "BUY  ·  Rowan's Stock",
+		"Shop stock should be clearly separated as the buying section"
+	)
+	_check(
+		save_ui_game.get("shop_inventory_list").get_parent().get_parent().get_child(0).text == "SELL  ·  Your Items",
+		"Player inventory should be clearly separated as the selling section"
+	)
+	_check(_find_button(save_ui_game, "Buy 20 G") != null, "Buy buttons should state the full price")
 	save_ui_game.call("_buy_shop_item", "Potion")
 	_check(save_ui_game.get("potions") == 1 and save_ui_game.get("gold") == 980, "Buying a potion should charge gold and add one potion")
 	_check(save_ui_game.get("gold_label").text == "Gold: 980 G", "The HUD should show the updated balance after purchases")
+	_check(_find_button(save_ui_game, "Sell +10 G") != null, "Sell buttons should clearly show the gold received")
 	save_ui_game.call("_sell_shop_item", "Potion")
 	_check(save_ui_game.get("potions") == 0 and save_ui_game.get("gold") == 990, "Selling a potion should remove one and pay its sell price")
 	_check(save_ui_game.get("gold_label").text == "Gold: 990 G", "The HUD should show gold gained from sales")
@@ -567,6 +577,16 @@ func _run() -> void:
 		inventory_text += label.text
 	_check(inventory_text.contains("Compared with"), "Bag gear should show a comparison with the equipped item")
 	_check(inventory_text.contains("Iron Helm"), "Bag contents should include head-slot gear")
+	var inventory_has_sell_button := false
+	var inventory_has_equip_button := false
+	var inventory_has_discard_button := false
+	for button in save_ui_game.get("inventory_layer").find_children("*", "Button", true, false):
+		inventory_has_sell_button = inventory_has_sell_button or button.text.begins_with("Sell")
+		inventory_has_equip_button = inventory_has_equip_button or button.text == "Equip: Head"
+		inventory_has_discard_button = inventory_has_discard_button or button.text == "Discard 1"
+	_check(not inventory_has_sell_button, "Bag actions should not mix selling with equipping and discarding")
+	_check(inventory_has_equip_button, "Bag equip controls should name the equipment slot")
+	_check(inventory_has_discard_button, "Bag discard controls should be explicit")
 	var gold_before_remote_sale: int = save_ui_game.get("gold")
 	save_ui_game.call("_drop_item", "Iron Sword")
 	_check(save_ui_game.get("equipment_inventory").has("Iron Sword"), "Equipped gear should not be droppable")

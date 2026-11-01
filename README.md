@@ -9,7 +9,8 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - After restoring peace, accept Mira's optional hunter contract: examine clues, then fight Ashwing and Thornback in two targetable mixed encounters
 - Distinct enemy tactics include Ashwing's MP-draining Cinder bolt and Thornback's one-hit Shell guard; the wolf is fast and the Cave Sentinel wards itself
 - Every monster encounter awards gold on victory; battle results show the drop, and mixed encounters combine both monsters' gold
-- Trade with Rowan in the village: buy potions and gear, sell unequipped equipment, and equip one item in each weapon, body, head, arms, hands, legs, and feet slot
+- Rowan's shop separates buying from selling: buy from stock, sell items from your inventory, and see the price or payout on each button
+- The Bag is for equipping gear and discarding extras; it compares gear with the currently equipped item and prevents removing the equipped copy
 - After restoring peace, explore an optional cave, face the Cave Sentinel's ward, and claim its one-time Crystal Heart reward
 - Earn gold for completing the quest; progress saves between sessions
 - Terrain and character pixel art are generated at runtime as placeholders until source art is added
@@ -25,11 +26,12 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 ### Greenvale Adventure
 - **WASD** or **Arrow Keys**: Move
 - **E**: Talk to Mira, trade with Rowan, or continue dialogue
-- **I** or **Bag**: Open the character and inventory menu anywhere; compare/equip gear and drop unwanted items
+- **I** or **Bag**: Open the character and inventory menu anywhere; compare/equip gear and discard unwanted items
 - **1-5** (or click): Attack, Ember magic, Guard, Potion, Flee
 - In mixed battles, click an enemy's target button before choosing an action
 - Ember costs 8 MP; victories award XP, and leveling up increases maximum HP and MP without restoring damage or spent MP
-- Sell potions and unequipped gear at Rowan's shop beside the village gate; equipped items must be unequipped before they can be sold or dropped
+- At Rowan's shop beside the village gate, use **Buy** for shop stock and **Sell +N G** for your items; the Bag has separate **Equip** and **Discard** actions
+- Equipped items cannot be discarded or sold unless you own another copy; selling is only available in Rowan's shop
 - Gear for all seven equipment slots adds physical/Ember damage or reduces incoming hits
 - Complete Mira's adventure to unlock the cave; interact with the cave entrance, treasure, and exit using **E**
 - **Save / Load**: Open the three-slot save menu; overwriting a used slot requires confirmation
