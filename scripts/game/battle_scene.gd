@@ -22,6 +22,9 @@ var hero_vitality: int = 13
 var hero_strength: int = 10
 var hero_spirit: int = 12
 var hero_agility: int = 10
+var weapon_attack_bonus: int = 0
+var weapon_magic_bonus: int = 0
+var armor_defense: int = 0
 var guarding: bool = false
 var active: bool = false
 var battle_outcome: String = ""
@@ -60,7 +63,10 @@ func start_battle(
 		vitality: int,
 		strength: int,
 		spirit: int,
-		agility: int
+		agility: int,
+		attack_bonus: int = 0,
+		magic_bonus: int = 0,
+		defense_bonus: int = 0
 ) -> void:
 	enemy_name = foe_name
 	enemy_max_hp = foe_hp
@@ -82,6 +88,9 @@ func start_battle(
 	hero_strength = strength
 	hero_spirit = spirit
 	hero_agility = agility
+	weapon_attack_bonus = attack_bonus
+	weapon_magic_bonus = magic_bonus
+	armor_defense = defense_bonus
 	active = true
 	battle_outcome = ""
 	enemy_art.texture = _make_enemy_texture(enemy_color)
@@ -240,7 +249,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _attack() -> void:
 	if not active:
 		return
-	var damage := randi_range(18, 25) + (hero_strength - 10) * 2 + (player_level - 1) * 3
+	var damage := randi_range(18, 25) + (hero_strength - 10) * 2 \
+		+ (player_level - 1) * 3 + weapon_attack_bonus
 	if hero_class == "Warrior":
 		damage += 4
 	damage = maxi(damage, 1)
@@ -252,7 +262,7 @@ func _cast_magic() -> void:
 	if not active or player_mp < 8:
 		return
 	player_mp -= 8
-	var damage := 18 + hero_spirit * 2 + (player_level - 1) * 4
+	var damage := 18 + hero_spirit * 2 + (player_level - 1) * 4 + weapon_magic_bonus
 	if hero_class == "Mage":
 		damage += 8
 	var damage_result := _damage_enemy(damage, "fire", "Ember hits %s for %d damage")
@@ -305,6 +315,7 @@ func _after_player_action() -> void:
 		return
 	if intent.begins_with("Heavy"):
 		damage = ceili(damage * 1.65)
+	damage = maxi(damage - armor_defense, 1)
 	if guarding:
 		damage = ceili(damage * (0.25 if hero_class == "Warrior" else 0.4))
 		guarding = false

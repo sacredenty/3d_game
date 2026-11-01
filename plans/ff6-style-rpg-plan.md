@@ -9,9 +9,9 @@ Build a turn-based JRPG with FF6-inspired world exploration mechanics using Godo
 
 ### Current Prototype Milestone
 
-The current playable prototype covers a village/forest adventure with two connected quests, two distinct enemy encounters, reusable turn-based battles with enemy intent and elemental/physical weaknesses, optional potion/gold/XP discoveries, a healing campfire, NPC dialogue, saved progression, and a hero-creation screen with name, class, and rerollable class-based stats. Warrior, Mage, and Rogue have distinct combat advantages. Completing the adventure unlocks an optional cave with a Cave Sentinel encounter, a ward mechanic, and a permanent one-time treasure reward. This is a vertical-slice milestone, not completion of the broader phases below.
+The current playable prototype covers a village/forest adventure with two connected quests, two distinct enemy encounters, reusable turn-based battles with enemy intent and elemental/physical weaknesses, optional potion/gold/XP discoveries, a healing campfire, NPC dialogue, saved progression, and a hero-creation screen with name, class, and rerollable class-based stats. Warrior, Mage, and Rogue have distinct combat advantages. The village trader sells potions and equipment; one item can be equipped in each of seven slots (weapon, body, head, arms, hands, legs, and feet), with stats contributing to battle damage and defense. Completing the adventure unlocks an optional cave with a Cave Sentinel encounter, a ward mechanic, and a permanent one-time treasure reward. This is a vertical-slice milestone, not completion of the broader phases below.
 
-**Recommended next step:** playtest the new cave, class balance, and progression pacing; tune encounter difficulty and rewards based on results before expanding the party roster.
+**Recommended next step:** playtest the equipment economy and class balance, then add character sprites, enemy designs, and UI assets before expanding party or dungeon scope.
 
 ---
 

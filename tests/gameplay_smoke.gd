@@ -265,7 +265,7 @@ func _run() -> void:
 	resumed_game.queue_free()
 	await process_frame
 
-	for old_version in [1, 2, 3, 4, 5, 6]:
+	for old_version in [1, 2, 3, 4, 5, 6, 7, 8]:
 		var old_save := FileAccess.open(save_path, FileAccess.WRITE)
 		var old_save_data := {
 			"version": old_version,
@@ -291,6 +291,18 @@ func _run() -> void:
 			}, true)
 		if old_version >= 6:
 			old_save_data.merge({"position_x": 250.0, "position_y": 448.0}, true)
+		if old_version >= 7:
+			old_save_data.merge({
+				"in_cave": false,
+				"cave_guardian_defeated": false,
+				"cave_treasure_claimed": false
+			}, true)
+		if old_version >= 8:
+			old_save_data.merge({
+				"equipment_inventory": ["Traveler's Blade", "Wanderer's Coat"],
+				"equipped_weapon": "Traveler's Blade",
+				"equipped_armor": "Wanderer's Coat"
+			}, true)
 		old_save.store_string(JSON.stringify(old_save_data))
 		old_save.close()
 		var migrated_game: Node = load("res://scenes/game.tscn").instantiate()
@@ -305,6 +317,10 @@ func _run() -> void:
 		_check(not migrated_game.get("in_cave"), "Older saves should default to outside the cave")
 		_check(not migrated_game.get("cave_guardian_defeated"), "Older saves should default cave progress to uncleared")
 		_check(not migrated_game.get("cave_treasure_claimed"), "Older saves should default cave treasure to unclaimed")
+		_check(migrated_game.get("equipped_slots").get("weapon") == "Traveler's Blade", "Older saves should receive starter weapon equipment")
+		_check(migrated_game.get("equipped_slots").get("armor") == "Wanderer's Coat", "Older saves should receive starter armor")
+		_check(migrated_game.get("equipped_slots").get("legs") == "Traveler's Trousers", "Older saves should receive starter leg equipment")
+		_check(migrated_game.get("equipped_slots").get("feet") == "Trail Boots", "Older saves should receive starter footwear")
 		migrated_game.queue_free()
 		await process_frame
 
@@ -389,7 +405,83 @@ func _run() -> void:
 	save_ui_game.call("_confirm_hero_creation")
 	_check(save_ui_game.get("hero_name") == "Fresh Start", "New Game should start with the newly created hero")
 	_check(FileAccess.file_exists("user://gameplay_save_ui_slot_2.json"), "Starting a new game should preserve other save slots")
+	_check(save_ui_game.get("equipment_inventory").size() == 4, "New Game should reset equipment to all starter gear")
+	save_ui_game.set("gold", 1000)
+	save_ui_player.global_position = save_ui_game.get("merchant").global_position
+	save_ui_game.call("_update_prompt")
+	_check(save_ui_game.get("prompt_label").text == "E  Trade with Rowan", "The village should have a dedicated shopkeeper prompt")
+	var trade_event := InputEventKey.new()
+	trade_event.physical_keycode = KEY_E
+	trade_event.pressed = true
+	save_ui_game.call("_unhandled_input", trade_event)
+	_check(save_ui_game.get("shop_layer").visible, "Interacting with Rowan should open the shop")
+	_check(not save_ui_player.get("movement_enabled"), "The shop should pause player movement")
+	save_ui_game.call("_buy_shop_item", "Potion")
+	_check(save_ui_game.get("potions") == 1 and save_ui_game.get("gold") == 980, "Buying a potion should charge gold and add one potion")
+	save_ui_game.call("_sell_shop_item", "Potion")
+	_check(save_ui_game.get("potions") == 0 and save_ui_game.get("gold") == 990, "Selling a potion should remove one and pay its sell price")
+	save_ui_game.call("_buy_shop_item", "Iron Sword")
+	save_ui_game.call("_buy_shop_item", "Oak Staff")
+	save_ui_game.call("_buy_shop_item", "Leather Armor")
+	save_ui_game.call("_buy_shop_item", "Leather Cap")
+	save_ui_game.call("_buy_shop_item", "Bracers")
+	save_ui_game.call("_buy_shop_item", "Silk Gloves")
+	save_ui_game.call("_buy_shop_item", "Iron Greaves")
+	save_ui_game.call("_buy_shop_item", "Swift Boots")
+	_check(save_ui_game.get("equipment_inventory").has("Iron Sword"), "Purchased equipment should enter the inventory")
+	save_ui_game.call("_equip_item", "Iron Sword")
+	_check(save_ui_game.get("equipped_slots").get("weapon") == "Iron Sword", "Equipping a new weapon should occupy the single weapon slot")
+	_check(save_ui_game.get("equipment_inventory").has("Traveler's Blade"), "The starter weapon should remain owned, not count as a second equipped weapon")
+	_check(save_ui_game.get("equipped_slots").get("weapon") != "Traveler's Blade", "Only one weapon can be equipped at once")
+	save_ui_game.call("_equip_item", "Oak Staff")
+	save_ui_game.call("_equip_item", "Leather Armor")
+	save_ui_game.call("_equip_item", "Leather Cap")
+	save_ui_game.call("_equip_item", "Bracers")
+	save_ui_game.call("_equip_item", "Silk Gloves")
+	save_ui_game.call("_equip_item", "Iron Greaves")
+	save_ui_game.call("_equip_item", "Swift Boots")
+	var gold_before_blocked_sale: int = save_ui_game.get("gold")
+	save_ui_game.call("_sell_shop_item", "Oak Staff")
+	_check(save_ui_game.get("gold") == gold_before_blocked_sale, "Equipped gear should not be sellable")
+	save_ui_game.call("_equip_item", "Iron Sword")
+	save_ui_game.call("_sell_shop_item", "Oak Staff")
+	_check(not save_ui_game.get("equipment_inventory").has("Oak Staff"), "Unequipped gear should be sellable")
+	_check(save_ui_game.get("gold") == gold_before_blocked_sale + 50, "Selling equipment should grant its listed value")
+	_check(save_ui_game.get("equipped_slots").get("weapon") == "Iron Sword", "Only the selected weapon should remain equipped")
+	_check(save_ui_game.get("equipped_slots").get("armor") == "Leather Armor", "Body armor should occupy its own equipment slot")
+	for slot in ["head", "arms", "hands", "legs", "feet"]:
+		_check(not str(save_ui_game.get("equipped_slots").get(slot, "")).is_empty(), "%s equipment should occupy its own slot" % slot)
+	save_ui_game.call("_close_shop")
+	_check(save_ui_player.get("movement_enabled"), "Closing the shop should restore movement")
+	save_ui_game.call("_start_battle", "shade")
+	var gear_battle: Node = save_ui_game.get("battle_instance")
+	_check(gear_battle.get("weapon_attack_bonus") == 9, "Equipped weapon, arms, and feet gear should affect physical damage")
+	_check(gear_battle.get("weapon_magic_bonus") == 3, "Equipped hands gear should affect Ember damage")
+	_check(gear_battle.get("armor_defense") == 9, "Equipped armor across all slots should reduce incoming damage")
+	var gear_battle_hp := int(gear_battle.get("player_hp"))
+	gear_battle.set("enemy_hp", 500)
+	gear_battle.call("_attack")
+	_check(int(gear_battle.get("enemy_hp")) <= 500 - 27, "All equipped physical bonuses should apply to attacks")
+	_check(gear_battle_hp - int(gear_battle.get("player_hp")) <= 16, "All equipped armor slots should reduce damage received")
+	gear_battle.call("_flee")
+	gear_battle.get("result_button").emit_signal("pressed")
+	var equipment_save_path := str(save_ui_game.get("progress_save_path"))
 	save_ui_game.queue_free()
+	await process_frame
+	var equipment_loaded_game: Node = load("res://scenes/game.tscn").instantiate()
+	equipment_loaded_game.set("progress_save_path", equipment_save_path)
+	root.add_child(equipment_loaded_game)
+	await process_frame
+	_check(equipment_loaded_game.get("equipped_slots").get("weapon") == "Iron Sword", "The single equipped weapon should persist after loading")
+	_check(equipment_loaded_game.get("equipped_slots").get("armor") == "Leather Armor", "Equipped body armor should persist after loading")
+	_check(equipment_loaded_game.get("equipped_slots").get("head") == "Leather Cap", "Head equipment should persist after loading")
+	_check(equipment_loaded_game.get("equipped_slots").get("arms") == "Bracers", "Arm equipment should persist after loading")
+	_check(equipment_loaded_game.get("equipped_slots").get("hands") == "Silk Gloves", "Hand equipment should persist after loading")
+	_check(equipment_loaded_game.get("equipped_slots").get("legs") == "Iron Greaves", "Leg equipment should persist after loading")
+	_check(equipment_loaded_game.get("equipped_slots").get("feet") == "Swift Boots", "Foot equipment should persist after loading")
+	_check(not equipment_loaded_game.get("equipment_inventory").has("Oak Staff"), "Sold equipment should stay sold after loading")
+	_check(equipment_loaded_game.get("gold") == 465, "Shop transactions should persist after loading")
+	equipment_loaded_game.queue_free()
 	await process_frame
 	_remove_test_file(ui_test_path)
 	for slot_index in range(3):

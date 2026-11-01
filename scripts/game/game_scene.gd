@@ -18,14 +18,45 @@ const CAVE_GUARDIAN_POSITION := Vector2(920.0, 800.0)
 const CAVE_TREASURE_POSITION := Vector2(840.0, 800.0)
 const PLAYER_MAX_HP := 100
 const PROGRESS_SAVE_PATH := "user://greenvale_progress.json"
-const SAVE_VERSION := 7
+const SAVE_VERSION := 9
 const SAVE_SLOT_COUNT := 3
 const STARTING_MP := 30
 const DEFAULT_HERO_NAME := "Adventurer"
 const DEFAULT_HERO_CLASS := "Warrior"
+const EQUIPMENT_SLOTS := ["weapon", "armor", "head", "arms", "hands", "legs", "feet"]
+const EQUIPMENT_SLOT_LABELS := {
+	"weapon": "Weapon", "armor": "Body", "head": "Head", "arms": "Arms",
+	"hands": "Hands", "legs": "Legs", "feet": "Feet"
+}
+const SHOP_ITEMS := [
+	"Potion", "Iron Sword", "Oak Staff", "Leather Armor", "Chain Vest",
+	"Leather Cap", "Iron Helm", "Bracers", "Knight's Gauntlets",
+	"Work Gloves", "Silk Gloves", "Traveler's Trousers", "Iron Greaves",
+	"Trail Boots", "Swift Boots"
+]
+const ITEM_CATALOG := {
+	"Potion": {"type": "consumable", "price": 20, "sell_price": 10, "description": "Restores HP in battle."},
+	"Traveler's Blade": {"type": "weapon", "attack": 0, "magic": 0, "defense": 0, "price": 0, "sell_price": 0, "description": "A reliable starting weapon."},
+	"Wanderer's Coat": {"type": "armor", "attack": 0, "magic": 0, "defense": 0, "price": 0, "sell_price": 0, "description": "Light travel clothes."},
+	"Iron Sword": {"type": "weapon", "attack": 7, "magic": 0, "defense": 0, "price": 90, "sell_price": 45, "description": "+7 physical damage."},
+	"Oak Staff": {"type": "weapon", "attack": 4, "magic": 8, "defense": 0, "price": 100, "sell_price": 50, "description": "+4 physical, +8 Ember damage."},
+	"Leather Armor": {"type": "armor", "attack": 0, "magic": 0, "defense": 3, "price": 80, "sell_price": 40, "description": "Reduces each hit by 3."},
+	"Chain Vest": {"type": "armor", "attack": 0, "magic": 0, "defense": 5, "price": 150, "sell_price": 75, "description": "Reduces each hit by 5."},
+	"Leather Cap": {"type": "head", "attack": 0, "magic": 0, "defense": 1, "price": 35, "sell_price": 17, "description": "A simple protective cap."},
+	"Iron Helm": {"type": "head", "attack": 0, "magic": 0, "defense": 3, "price": 85, "sell_price": 42, "description": "A sturdy helmet."},
+	"Bracers": {"type": "arms", "attack": 1, "magic": 0, "defense": 1, "price": 45, "sell_price": 22, "description": "+1 physical damage, +1 defense."},
+	"Knight's Gauntlets": {"type": "arms", "attack": 2, "magic": 0, "defense": 2, "price": 100, "sell_price": 50, "description": "+2 physical damage, +2 defense."},
+	"Work Gloves": {"type": "hands", "attack": 1, "magic": 0, "defense": 0, "price": 30, "sell_price": 15, "description": "+1 physical damage."},
+	"Silk Gloves": {"type": "hands", "attack": 0, "magic": 3, "defense": 0, "price": 65, "sell_price": 32, "description": "+3 Ember damage."},
+	"Traveler's Trousers": {"type": "legs", "attack": 0, "magic": 0, "defense": 1, "price": 40, "sell_price": 20, "description": "Comfortable traveling gear."},
+	"Iron Greaves": {"type": "legs", "attack": 0, "magic": 0, "defense": 3, "price": 90, "sell_price": 45, "description": "Heavy leg protection."},
+	"Trail Boots": {"type": "feet", "attack": 0, "magic": 0, "defense": 1, "price": 35, "sell_price": 17, "description": "Reliable boots for rough paths."},
+	"Swift Boots": {"type": "feet", "attack": 1, "magic": 0, "defense": 1, "price": 70, "sell_price": 35, "description": "+1 physical damage, +1 defense."}
+}
 
 var player: CharacterBody2D
 var npc: StaticBody2D
+var merchant: StaticBody2D
 var cave_seal: CollisionShape2D
 var world_tiles: TileMapLayer
 var tree_positions: Array[Vector2] = []
@@ -48,6 +79,13 @@ var hero_spirit: int = 12
 var hero_agility: int = 10
 var potions: int = 0
 var gold: int = 0
+var equipment_inventory: Array[String] = [
+	"Traveler's Blade", "Wanderer's Coat", "Traveler's Trousers", "Trail Boots"
+]
+var equipped_slots: Dictionary = {
+	"weapon": "Traveler's Blade", "armor": "Wanderer's Coat", "head": "",
+	"arms": "", "hands": "", "legs": "Traveler's Trousers", "feet": "Trail Boots"
+}
 var salve_collected: bool = false
 var cache_opened: bool = false
 var waystone_discovered: bool = false
@@ -63,6 +101,7 @@ var save_slot_prefix: String = ""
 var hud_layer: CanvasLayer
 var objective_label: Label
 var hero_identity_label: Label
+var equipment_label: Label
 var hp_bar: ProgressBar
 var mp_bar: ProgressBar
 var experience_bar: ProgressBar
@@ -87,6 +126,10 @@ var save_slot_labels: Array[Label] = []
 var save_slot_load_buttons: Array[Button] = []
 var save_overwrite_dialog: ConfirmationDialog
 var pending_save_slot: int = -1
+var shop_layer: CanvasLayer
+var shop_status: Label
+var shop_catalog_list: VBoxContainer
+var shop_inventory_list: VBoxContainer
 
 func _ready() -> void:
 	save_slot_prefix = progress_save_path.get_basename()
@@ -462,6 +505,24 @@ func _build_npc() -> void:
 	npc.add_child(sprite)
 	add_child(npc)
 
+	merchant = StaticBody2D.new()
+	merchant.name = "Rowan"
+	merchant.position = Vector2(520, 448)
+	merchant.z_index = 2
+	var merchant_collision := CollisionShape2D.new()
+	var merchant_shape := CircleShape2D.new()
+	merchant_shape.radius = 13.0
+	merchant_collision.shape = merchant_shape
+	merchant.add_child(merchant_collision)
+	var merchant_sprite := Sprite2D.new()
+	merchant_sprite.name = "CharacterSprite"
+	merchant_sprite.texture = _make_character_texture(Color("a77b48"), Color("473d37"), Color("e2c36d"))
+	merchant_sprite.position.y = -22.0
+	merchant_sprite.scale = Vector2(1.5, 1.5)
+	merchant_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	merchant.add_child(merchant_sprite)
+	add_child(merchant)
+
 func _add_sprite_rect(parent: Node2D, offset: Vector2, size: Vector2, color: Color) -> void:
 	var rect := ColorRect.new()
 	rect.position = offset
@@ -479,7 +540,7 @@ func _build_interface() -> void:
 	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(screen)
 
-	var hud := _make_panel(screen, Rect2(18, 18, 474, 192))
+	var hud := _make_panel(screen, Rect2(18, 18, 474, 230))
 	var hud_content := VBoxContainer.new()
 	hud_content.add_theme_constant_override("separation", 6)
 	hud.add_child(hud_content)
@@ -490,6 +551,9 @@ func _build_interface() -> void:
 	objective_label = _make_label("", 15, Color("e8eddb"))
 	objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hud_content.add_child(objective_label)
+	equipment_label = _make_label("", 12, Color("c7d4be"))
+	equipment_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hud_content.add_child(equipment_label)
 
 	var stats := HBoxContainer.new()
 	stats.add_theme_constant_override("separation", 10)
@@ -561,6 +625,7 @@ func _build_interface() -> void:
 	screen.add_child(new_game_dialog)
 	_build_hero_creation()
 	_build_save_load_ui(screen)
+	_build_shop_ui(screen)
 	_update_hud()
 
 func _build_hero_creation() -> void:
@@ -749,7 +814,7 @@ func _save_slot_path(slot_index: int) -> String:
 	return "%s_slot_%d.json" % [save_slot_prefix, slot_index + 1]
 
 func _open_save_load_ui() -> void:
-	if creation_layer.visible or battle_active or dialogue_active:
+	if creation_layer.visible or shop_layer.visible or battle_active or dialogue_active:
 		return
 	player.set("movement_enabled", false)
 	_update_save_slot_rows()
@@ -815,6 +880,196 @@ func _confirm_save_slot() -> void:
 
 func _cancel_save_overwrite() -> void:
 	pending_save_slot = -1
+
+func _build_shop_ui(screen: Control) -> void:
+	shop_layer = CanvasLayer.new()
+	shop_layer.layer = 16
+	add_child(shop_layer)
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	shop_layer.add_child(overlay)
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.03, 0.06, 0.08, 0.84)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(backdrop)
+	var panel := _make_panel(overlay, Rect2(80, 36, 800, 528))
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 10)
+	panel.add_child(content)
+	var title := _make_label("ROWAN'S TRADING POST", 23, Color("f4e3b8"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(title)
+	shop_status = _make_label("", 14, Color("f3d890"))
+	shop_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(shop_status)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 18)
+	content.add_child(columns)
+	shop_catalog_list = _make_shop_list(columns, "For Sale")
+	shop_inventory_list = _make_shop_list(columns, "Your Inventory")
+	var close_button := _make_button("Leave Shop")
+	close_button.custom_minimum_size = Vector2(220, 38)
+	close_button.pressed.connect(_close_shop)
+	content.add_child(close_button)
+	shop_layer.hide()
+
+func _make_shop_list(parent: HBoxContainer, title: String) -> VBoxContainer:
+	var section := VBoxContainer.new()
+	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(section)
+	var heading := _make_label(title, 17, Color("f3d890"))
+	section.add_child(heading)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(340, 350)
+	section.add_child(scroll)
+	var item_list := VBoxContainer.new()
+	item_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	item_list.add_theme_constant_override("separation", 6)
+	scroll.add_child(item_list)
+	return item_list
+
+func _open_shop() -> void:
+	if creation_layer.visible or save_load_layer.visible or battle_active or dialogue_active \
+		or player.global_position.distance_to(merchant.global_position) >= 76.0:
+		return
+	player.set("movement_enabled", false)
+	shop_status.text = "Gold: %d G" % gold
+	_refresh_shop_ui()
+	shop_layer.show()
+
+func _close_shop() -> void:
+	shop_layer.hide()
+	if not creation_layer.visible and not battle_active and not save_load_layer.visible:
+		player.set("movement_enabled", true)
+
+func _refresh_shop_ui() -> void:
+	for item_list in [shop_catalog_list, shop_inventory_list]:
+		for child in item_list.get_children():
+			item_list.remove_child(child)
+			child.queue_free()
+
+	for item_name in SHOP_ITEMS:
+		var item: Dictionary = ITEM_CATALOG[item_name]
+		var row := HBoxContainer.new()
+		shop_catalog_list.add_child(row)
+		var details := _make_label("%s\n%s  ·  %d G" % [
+			item_name, item["description"], item["price"]
+		], 13, Color("e8eddb"))
+		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(details)
+		var buy_button := _make_button("Buy")
+		buy_button.custom_minimum_size = Vector2(76, 36)
+		buy_button.disabled = gold < int(item["price"])
+		buy_button.pressed.connect(_buy_shop_item.bind(item_name))
+		row.add_child(buy_button)
+
+	if potions > 0:
+		var potion_row := HBoxContainer.new()
+		shop_inventory_list.add_child(potion_row)
+		var potion_details := _make_label("Potion ×%d\nRestores HP in battle." % potions, 13, Color("e8eddb"))
+		potion_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		potion_row.add_child(potion_details)
+		var sell_potion := _make_button("Sell 10 G")
+		sell_potion.custom_minimum_size = Vector2(100, 36)
+		sell_potion.pressed.connect(_sell_shop_item.bind("Potion"))
+		potion_row.add_child(sell_potion)
+
+	var listed_equipment: Dictionary = {}
+	for item_name in equipment_inventory:
+		if listed_equipment.has(item_name):
+			continue
+		listed_equipment[item_name] = true
+		var item: Dictionary = ITEM_CATALOG[item_name]
+		var slot: String = item["type"]
+		var is_equipped: bool = equipped_slots.get(slot, "") == item_name
+		var owned_count := equipment_inventory.count(item_name)
+		var equipped_count := int(equipped_slots.get(slot, "") == item_name)
+		var row := HBoxContainer.new()
+		shop_inventory_list.add_child(row)
+		var details := _make_label("%s  ·  %s ×%d%s\n%s" % [
+			EQUIPMENT_SLOT_LABELS[slot], item_name, owned_count,
+			"  (Equipped)" if is_equipped else "", item["description"]
+		], 13, Color("e8eddb"))
+		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(details)
+		var equip_button := _make_button("Equipped" if is_equipped else "Equip")
+		equip_button.custom_minimum_size = Vector2(88, 36)
+		equip_button.disabled = is_equipped
+		equip_button.pressed.connect(_equip_item.bind(item_name))
+		row.add_child(equip_button)
+		var sell_button := _make_button("Sell %d G" % item["sell_price"])
+		sell_button.custom_minimum_size = Vector2(100, 36)
+		sell_button.disabled = owned_count <= equipped_count or int(item["sell_price"]) <= 0
+		sell_button.pressed.connect(_sell_shop_item.bind(item_name))
+		row.add_child(sell_button)
+
+func _buy_shop_item(item_name: String) -> void:
+	if not SHOP_ITEMS.has(item_name):
+		push_error("Unknown shop item: %s" % item_name)
+		return
+	var item: Dictionary = ITEM_CATALOG[item_name]
+	var price := int(item["price"])
+	if item["type"] == "consumable" and potions >= 99:
+		shop_status.text = "Your potion inventory is full."
+		return
+	if item["type"] != "consumable" and equipment_inventory.size() >= 99:
+		shop_status.text = "Your equipment inventory is full."
+		return
+	if gold < price:
+		shop_status.text = "Not enough gold."
+		return
+	gold -= price
+	if item["type"] == "consumable":
+		potions = mini(potions + 1, 99)
+	else:
+		equipment_inventory.append(item_name)
+	shop_status.text = "Purchased %s." % item_name
+	_persist_shop_transaction()
+
+func _sell_shop_item(item_name: String) -> void:
+	if item_name == "Potion":
+		if potions <= 0:
+			return
+		potions -= 1
+	else:
+		var item: Dictionary = ITEM_CATALOG.get(item_name, {})
+		var item_slot: String = item.get("type", "")
+		var equipped_count := int(equipped_slots.get(item_slot, "") == item_name)
+		if item.is_empty() or equipment_inventory.count(item_name) <= equipped_count \
+			or int(item["sell_price"]) <= 0:
+			return
+		equipment_inventory.erase(item_name)
+	gold += int(ITEM_CATALOG[item_name]["sell_price"])
+	shop_status.text = "Sold %s." % item_name
+	_persist_shop_transaction()
+
+func _equip_item(item_name: String) -> void:
+	if not equipment_inventory.has(item_name):
+		return
+	var item: Dictionary = ITEM_CATALOG.get(item_name, {})
+	var slot: String = item.get("type", "")
+	if not EQUIPMENT_SLOTS.has(slot):
+		return
+	equipped_slots[slot] = item_name
+	shop_status.text = "Equipped %s in the %s slot." % [item_name, EQUIPMENT_SLOT_LABELS[slot]]
+	_persist_shop_transaction()
+
+func _persist_shop_transaction() -> void:
+	var save_error := save_progress(progress_save_path)
+	if save_error != OK:
+		push_error("Could not save shop transaction: %s" % error_string(save_error))
+		shop_status.text = "Transaction complete, but progress could not be saved."
+		_update_hud()
+		_refresh_shop_ui()
+		return
+	shop_status.text = "%s  ·  Gold: %d G" % [shop_status.text, gold]
+	_update_hud()
+	_refresh_shop_ui()
 
 func _load_slot(slot_index: int) -> void:
 	if slot_index < 0 or slot_index >= SAVE_SLOT_COUNT:
@@ -905,23 +1160,28 @@ func _process(_delta: float) -> void:
 		_start_battle("guardian")
 
 func _unhandled_input(event: InputEvent) -> void:
-	if creation_layer.visible or save_load_layer.visible:
+	if creation_layer.visible or save_load_layer.visible or shop_layer.visible:
 		return
 	if event.is_action_pressed("interact") and not event.is_echo() and not battle_active:
 		if dialogue_active:
 			_advance_dialogue()
 		elif player.global_position.distance_to(npc.global_position) < 76.0:
 			_talk_to_mira()
+		elif player.global_position.distance_to(merchant.global_position) < 76.0:
+			_open_shop()
 		else:
 			_interact_with_world()
 		get_viewport().set_input_as_handled()
 
 func _update_prompt() -> void:
-	if battle_active or dialogue_active:
+	if battle_active or dialogue_active or shop_layer.visible:
 		prompt_panel.hide()
 		return
 	if player.global_position.distance_to(npc.global_position) < 76.0:
 		prompt_label.text = "E  Talk to Mira"
+		prompt_panel.show()
+	elif player.global_position.distance_to(merchant.global_position) < 76.0:
+		prompt_label.text = "E  Trade with Rowan"
 		prompt_panel.show()
 	elif _near_world_object(SALVE_POSITION) and not salve_collected:
 		prompt_label.text = "E  Pick up a healing potion"
@@ -1098,8 +1358,19 @@ func _start_battle(encounter: String) -> void:
 		enemy["name"], enemy["hp"], enemy["damage"], enemy["xp"], enemy["color"],
 		enemy["weakness"], enemy["intents"],
 		player_hp, player_mp, player_level, potions,
-		hero_name, hero_class, hero_vitality, hero_strength, hero_spirit, hero_agility
+		hero_name, hero_class, hero_vitality, hero_strength, hero_spirit, hero_agility,
+		_equipment_stat("attack"),
+		_equipment_stat("magic"),
+		_equipment_stat("defense")
 	)
+
+func _equipment_stat(stat: String) -> int:
+	var total := 0
+	for slot in EQUIPMENT_SLOTS:
+		var item_name: String = equipped_slots[slot]
+		if not item_name.is_empty():
+			total += int(ITEM_CATALOG[item_name].get(stat, 0))
+	return total
 
 func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, experience: int) -> void:
 	player_hp = hp
@@ -1143,6 +1414,7 @@ func _update_hud() -> void:
 		return
 	cave_seal.disabled = quest_step >= 5
 	hero_identity_label.text = "%s  ·  %s" % [hero_name, hero_class]
+	equipment_label.text = "Gear: %s" % "  ·  ".join(_equipment_summary())
 	match quest_step:
 		0:
 			objective_label.text = "Objective: Speak with Mira near the village gate."
@@ -1163,6 +1435,16 @@ func _update_hud() -> void:
 	gold_label.text = "%d G" % gold
 	new_game_button.show()
 
+func _equipment_summary() -> PackedStringArray:
+	var summary := PackedStringArray()
+	for slot in EQUIPMENT_SLOTS:
+		var item_name: String = equipped_slots[slot]
+		summary.append("%s: %s" % [
+			EQUIPMENT_SLOT_LABELS[slot],
+			item_name if not item_name.is_empty() else "Empty"
+		])
+	return summary
+
 func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
@@ -1182,6 +1464,8 @@ func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 		"hero_strength": hero_strength,
 		"hero_spirit": hero_spirit,
 		"hero_agility": hero_agility,
+		"equipment_inventory": equipment_inventory.duplicate(),
+		"equipped_slots": equipped_slots.duplicate(true),
 		"position_x": player.global_position.x,
 		"position_y": player.global_position.y,
 		"salve_collected": salve_collected,
@@ -1260,6 +1544,9 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	):
 		push_error("Greenvale save is missing valid cave progress.")
 		return false
+	if int(save_version) >= 8 and not _is_valid_saved_equipment(parsed, int(save_version)):
+		push_error("Greenvale save is missing valid equipment values.")
+		return false
 
 	quest_step = clampi(int(parsed["quest_step"]), 0, 5)
 	if int(save_version) < 3 and quest_step == 2:
@@ -1273,6 +1560,23 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	hero_strength = clampi(int(parsed.get("hero_strength", 10)), 1, 30)
 	hero_spirit = clampi(int(parsed.get("hero_spirit", 12)), 1, 30)
 	hero_agility = clampi(int(parsed.get("hero_agility", 10)), 1, 30)
+	if int(save_version) >= 9:
+		equipment_inventory.clear()
+		for item_name in parsed["equipment_inventory"]:
+			equipment_inventory.append(item_name)
+		equipped_slots = parsed["equipped_slots"].duplicate()
+	elif int(save_version) == 8:
+		equipment_inventory.clear()
+		for item_name in parsed["equipment_inventory"]:
+			equipment_inventory.append(item_name)
+		equipped_slots = _default_equipped_slots()
+		equipped_slots["weapon"] = parsed["equipped_weapon"]
+		equipped_slots["armor"] = parsed["equipped_armor"]
+		for item_name in ["Traveler's Trousers", "Trail Boots"]:
+			if not equipment_inventory.has(item_name):
+				equipment_inventory.append(item_name)
+	else:
+		_reset_equipment()
 	player_hp = clampi(int(parsed["player_hp"]), 1, max_hp())
 	player_mp = clampi(int(parsed.get("player_mp", STARTING_MP)), 0, max_mp())
 	potions = clampi(int(parsed["potions"]), 0, 99)
@@ -1321,8 +1625,62 @@ func _is_saved_number(value: Variant) -> bool:
 		return false
 	return is_finite(float(value))
 
+func _is_valid_saved_equipment(parsed: Dictionary, save_version: int) -> bool:
+	var saved_inventory: Variant = parsed.get("equipment_inventory")
+	if not saved_inventory is Array or saved_inventory.size() > 99:
+		return false
+	for item_name in saved_inventory:
+		if typeof(item_name) != TYPE_STRING or not ITEM_CATALOG.has(item_name):
+			return false
+		if not EQUIPMENT_SLOTS.has(ITEM_CATALOG[item_name]["type"]):
+			return false
+	var saved_slots: Dictionary
+	if save_version == 8:
+		var saved_weapon: Variant = parsed.get("equipped_weapon")
+		var saved_armor: Variant = parsed.get("equipped_armor")
+		if typeof(saved_weapon) != TYPE_STRING or typeof(saved_armor) != TYPE_STRING:
+			return false
+		if not ITEM_CATALOG.has(saved_weapon) or not ITEM_CATALOG.has(saved_armor):
+			return false
+		if ITEM_CATALOG[saved_weapon]["type"] != "weapon" \
+			or ITEM_CATALOG[saved_armor]["type"] != "armor" \
+			or not saved_inventory.has(saved_weapon) or not saved_inventory.has(saved_armor):
+			return false
+		return true
+	var saved_equipped: Variant = parsed.get("equipped_slots")
+	if not saved_equipped is Dictionary:
+		return false
+	saved_slots = saved_equipped
+	for slot in EQUIPMENT_SLOTS:
+		if not saved_slots.has(slot) or typeof(saved_slots[slot]) != TYPE_STRING:
+			return false
+		var item_name: String = saved_slots[slot]
+		if item_name.is_empty():
+			continue
+		if not ITEM_CATALOG.has(item_name) or ITEM_CATALOG[item_name]["type"] != slot \
+			or not saved_inventory.has(item_name):
+			return false
+	return saved_slots.size() == EQUIPMENT_SLOTS.size()
+
+func _reset_equipment() -> void:
+	equipment_inventory = [
+		"Traveler's Blade", "Wanderer's Coat", "Traveler's Trousers", "Trail Boots"
+	]
+	equipped_slots = _default_equipped_slots()
+
+func _default_equipped_slots() -> Dictionary:
+	return {
+		"weapon": "Traveler's Blade",
+		"armor": "Wanderer's Coat",
+		"head": "",
+		"arms": "",
+		"hands": "",
+		"legs": "Traveler's Trousers",
+		"feet": "Trail Boots"
+	}
+
 func _confirm_new_game() -> void:
-	if creation_layer.visible or save_load_layer.visible or battle_active or dialogue_active:
+	if creation_layer.visible or save_load_layer.visible or shop_layer.visible or battle_active or dialogue_active:
 		return
 	new_game_dialog.popup_centered()
 
@@ -1341,6 +1699,7 @@ func _start_fresh_game() -> void:
 	salve_collected = false
 	cache_opened = false
 	waystone_discovered = false
+	_reset_equipment()
 	in_cave = false
 	cave_guardian_defeated = false
 	cave_treasure_claimed = false

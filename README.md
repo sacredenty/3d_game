@@ -6,6 +6,7 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 
 - Explore a tile-based village and forest clearing with solid world boundaries, trees, and buildings
 - Talk to Mira, complete two linked quests, and fight the Forest Shade and Bramble Wolf
+- Trade with Rowan in the village: buy potions and gear, sell unequipped equipment, and equip one item in each weapon, body, head, arms, hands, legs, and feet slot
 - After restoring peace, explore an optional cave, face the Cave Sentinel's ward, and claim its one-time Crystal Heart reward
 - Earn gold for completing the quest; progress saves between sessions
 - Terrain and character pixel art are generated at runtime as placeholders until source art is added
@@ -20,12 +21,13 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 
 ### Greenvale Adventure
 - **WASD** or **Arrow Keys**: Move
-- **E**: Talk to Mira / continue dialogue
+- **E**: Talk to Mira, trade with Rowan, or continue dialogue
 - **1-5** (or click): Attack, Ember magic, Guard, Potion, Flee
 - Ember costs 8 MP; victories award XP, and leveling up increases maximum HP and MP without restoring damage or spent MP
+- Rowan's shop is beside the village gate; gear for all seven equipment slots adds physical/Ember damage or reduces incoming hits
 - Complete Mira's adventure to unlock the cave; interact with the cave entrance, treasure, and exit using **E**
 - **Save / Load**: Open the three-slot save menu; overwriting a used slot requires confirmation
-- Quest, combat, hero, and world position progress auto-save as you play; loaded slots become the active auto-save
+- Quest, combat, equipment, inventory, and world position progress auto-save as you play; loaded slots become the active auto-save
 - Use **New Game** on the HUD at any time to start over; confirmation protects the active run, and other save slots remain unchanged
 
 ## Project Structure
