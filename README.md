@@ -61,28 +61,55 @@ A solo-hero, turn-based JRPG prototype built with Godot 4, inspired by classic J
 ```
 3d_game/
 ├── assets/
-│   ├── art/             # Authored SVG artwork used by the Greenvale slice
-│   ├── audio/           # Original WAV music and sound effects
-│   ├── characters/      # Legacy import metadata; not the active slice artwork
-│   ├── environments/    # Legacy import metadata; not the active slice tileset
-│   └── ui/              # Legacy import metadata; current UI is mostly code-drawn
+│   ├── art/             # App-specific artwork and SVG sources
+│   ├── audio/           # Music and sound effects
+│   ├── characters/      # Character art and metadata
+│   ├── environments/    # Environment art and metadata
+│   ├── tiles/           # Tile assets used in overworld and map scenes
+│   └── ui/              # UI art and metadata
+├── plans/               # Design notes and RPG planning docs
+├── scenarios/           # Scenario/test data for gameplay validation
 ├── scenes/
-│   ├── ui/main_menu.tscn
-│   ├── game.tscn        # Active Greenvale adventure
-│   ├── battle.tscn      # Battle UI used by the active slice
-│   ├── dungeons/        # Legacy dungeon prototype
-│   ├── combat/          # Legacy combat scenes
-│   └── autoloads/       # Legacy/general RPG system nodes
+│   ├── autoloads/       # Autoload scenes and shared system nodes
+│   ├── battle.tscn      # Battle scene template
+│   ├── dungeons/        # Dungeon-related prototypes and scenes
+│   ├── game.tscn        # Top-level game scene
+│   ├── main/            # Core main-scene setup and flow
+│   ├── minimal_test.tscn
+│   ├── overworld/       # Overworld scenes and map sections
+│   ├── overworld.tscn   # Main overworld scene
+│   ├── simple_main.tscn
+│   ├── simple_test.tscn
+│   ├── test_*.tscn      # Several focused movement and gameplay test scenes
+│   ├── transitions/     # Transition scenes and flow nodes
+│   └── ui/              # Menu and HUD scenes
 ├── scripts/
-│   ├── game/            # Active Greenvale and battle logic
-│   ├── ui/              # Active title menu
-│   ├── autoloads/       # Shared audio director and asset manager
-│   ├── systems/         # Older standalone system prototypes
-│   ├── dungeons/        # Legacy dungeon scene
-│   └── core/            # General RPG classes, not an active party system
-├── tests/gameplay_smoke.gd
-├── plans/              # Design documents
-└── project.godot       # Godot project file
+│   ├── autoloads/       # Shared managers and runtime systems
+│   ├── combat/          # Combat logic and battle systems
+│   ├── core/            # Core game classes and shared helpers
+│   ├── create_tileset.gd # Tile map generation helper
+│   ├── create_tileset.py # Python helper for tile asset generation
+│   ├── dungeons/        # Dungeon generation and logic
+│   ├── game/            # Main gameplay logic
+│   ├── main/            # Main scene scripts
+│   ├── overworld/       # Overworld movement and world logic
+│   ├── systems/         # Standalone or experimental system prototypes
+│   ├── test_movement.gd # Movement test script
+│   ├── transitions/     # Transition logic
+│   └── ui/              # HUD, menus, and interface scripts
+├── textures/
+│   ├── tileset.tres     # Tile set resource
+│   └── *.png            # World and sprite textures
+├── tests/
+│   └── gameplay_smoke.gd # Basic smoke-test gameplay script
+├── 3drpggame.csproj     # .NET/Godot project config
+├── encounter_system.tscn
+├── project.godot        # Godot project file
+├── README.md
+├── zone_manager.tscn
+├── .gitignore
+├── icon.svg
+└── icon.svg.import
 ```
 
 ## Next Recommended Milestone
