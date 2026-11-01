@@ -11,6 +11,7 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - Every monster encounter awards gold on victory; battle results show the drop, and mixed encounters combine both monsters' gold
 - Rowan's shop separates buying from selling: buy from stock, sell items from your inventory, and see the price or payout on each button
 - The Bag is for equipping gear and discarding extras; it compares gear with the currently equipped item and prevents removing the equipped copy
+- Open the world map and quest journal with **M** or the HUD button; the map marks the player's position, village landmarks, current clues, and unlocked destinations, while the journal separates active, completed, and upcoming objectives
 - After restoring peace, explore an optional cave, face the Cave Sentinel's ward, and claim its one-time Crystal Heart reward
 - Earn gold for completing the quest; progress saves between sessions
 - Terrain and character pixel art are generated at runtime as placeholders until source art is added
@@ -68,8 +69,8 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 
 ## Next Recommended Milestone
 
-1. **Playtest and balance**: Check clue readability, mixed-fight difficulty, class balance, and whether the hunter contract feels rewarding
-2. **Replace generated art**: Add authored hero, monster, environment, and UI assets while preserving the current gameplay layout
+1. **Playtest and balance**: Check whether the map and journal make clue routes clear, and tune mixed-fight difficulty, class balance, and monster gold rewards
+2. **Replace generated art**: Add authored hero, monster, environment, map, and UI assets while preserving the current gameplay layout
 3. **Add audio**: Give Greenvale, exploration clues, and each battle a distinct sound and music identity
 4. **Expand the world deliberately**: Build another connected location or party member only after the current quest-and-combat loop is fun
 5. **Prepare builds**: Add export presets and platform-specific testing after the content and controls stabilize

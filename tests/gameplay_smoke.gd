@@ -58,6 +58,26 @@ func _run() -> void:
 	_check(game.get("quest_step") == 0 and game.get("hero_name") == "Ari", "Canceling New Game should preserve the current run")
 	_check(game.get("quest_step") == 0, "New game should start with the village objective")
 	_check(game.get("world_tiles").get_used_cells().size() == 1500, "The overworld should use the complete tile atlas")
+	var map_key := InputEventKey.new()
+	map_key.keycode = KEY_M
+	map_key.pressed = true
+	game.call("_unhandled_input", map_key)
+	_check(game.get("map_journal_layer").visible, "M should open the world map and quest journal")
+	_check(not player.get("movement_enabled"), "Opening the map should pause player movement")
+	var marker_names := PackedStringArray()
+	for marker in game.call("_get_map_markers"):
+		marker_names.append(marker["name"])
+	_check(marker_names.has("Greenvale") and marker_names.has("Mira") and marker_names.has("Rowan"), "The map should identify village landmarks")
+	_check(not marker_names.has("Cave"), "The cave should remain hidden until the main quest opens it")
+	game.get("journal_tab_button").emit_signal("pressed")
+	_check(game.get("journal_page").visible and not game.get("map_page").visible, "Journal tab should switch to quest progress")
+	var journal_text := ""
+	for label in game.get("journal_entries").find_children("*", "Label", true, false):
+		journal_text += label.text + "\n"
+	_check(journal_text.contains("ACTIVE  —  Speak with Mira"), "Journal should identify the current main quest step")
+	game.call("_unhandled_input", map_key)
+	_check(not game.get("map_journal_layer").visible, "M should close the map and journal")
+	_check(player.get("movement_enabled"), "Closing the map should restore player movement")
 	player.global_position = game.get("npc").global_position
 	game.call("_talk_to_mira")
 	_check(game.get("quest_step") == 1, "Talking to Mira should unlock the first forest objective")
@@ -67,6 +87,13 @@ func _run() -> void:
 	_check(not game.get("cave_seal").disabled, "An incomplete adventure should keep the cave physically sealed")
 	game.call("_advance_dialogue")
 	game.call("_advance_dialogue")
+	game.call("_open_map_journal")
+	marker_names.clear()
+	for marker in game.call("_get_map_markers"):
+		marker_names.append(marker["name"])
+	_check(marker_names.has("North clue") and marker_names.has("Shade"), "The map should reveal the active trail and destination")
+	_check(game.get("map_canvas").is_visible_in_tree(), "The world map should display after opening")
+	game.call("_close_map_journal")
 
 	_interact_at(game, player, Vector2(880, 448))
 	_check(game.get("salve_collected"), "The trail potion should be collected")

@@ -60,6 +60,57 @@ const ITEM_CATALOG := {
 	"Swift Boots": {"type": "feet", "attack": 1, "magic": 0, "defense": 1, "price": 70, "sell_price": 35, "description": "+1 physical damage, +1 defense."}
 }
 
+class ExplorationMap extends Control:
+	var game: Node
+
+	func _draw() -> void:
+		var map_scale := minf((size.x - 24.0) / 1600.0, (size.y - 24.0) / 960.0)
+		var map_size := Vector2(1600.0, 960.0) * map_scale
+		var map_rect := Rect2((size - map_size) * 0.5, map_size)
+		draw_rect(map_rect, Color("536f49"), true)
+		draw_rect(map_rect, Color("c5b07d"), false, 3.0)
+		var world_scale := Vector2.ONE * map_scale
+		var path_points := PackedVector2Array([
+			_map_position(Vector2(500, 448), map_rect, world_scale),
+			_map_position(Vector2(720, 448), map_rect, world_scale),
+			_map_position(Vector2(1040, 448), map_rect, world_scale),
+			_map_position(Vector2(1330, 448), map_rect, world_scale),
+			_map_position(Vector2(1270, 620), map_rect, world_scale),
+			_map_position(Vector2(1360, 704), map_rect, world_scale),
+			_map_position(Vector2(1120, 800), map_rect, world_scale)
+		])
+		draw_polyline(path_points, Color("c5a577"), 12.0, true)
+		draw_rect(Rect2(_map_position(Vector2(808, 704), map_rect, world_scale), Vector2(304, 224) * world_scale), Color("323735"))
+		for marker in game.call("_get_map_markers"):
+			var point: Vector2 = _map_position(marker["position"], map_rect, world_scale)
+			var color: Color = marker["color"]
+			draw_circle(point, 7.0 if marker["status"] == "active" else 5.0, color)
+			draw_string(
+				ThemeDB.fallback_font,
+				point + Vector2(9, 4),
+				str(marker["name"]),
+				HORIZONTAL_ALIGNMENT_LEFT,
+				-1,
+				12,
+				Color("fff0d0")
+			)
+		var player_position: Vector2 = game.get("player").global_position
+		var player_point := _map_position(player_position, map_rect, world_scale)
+		draw_circle(player_point, 8.0, Color("75d8f0"))
+		draw_arc(player_point, 11.0, 0.0, TAU, 24, Color("152228"), 2.0)
+		draw_string(
+			ThemeDB.fallback_font,
+			player_point + Vector2(9, -8),
+			"You",
+			HORIZONTAL_ALIGNMENT_LEFT,
+			-1,
+			12,
+			Color("b7efff")
+		)
+
+	func _map_position(world_position: Vector2, map_rect: Rect2, world_scale: Vector2) -> Vector2:
+		return map_rect.position + world_position * world_scale
+
 var player: CharacterBody2D
 var npc: StaticBody2D
 var merchant: StaticBody2D
@@ -143,6 +194,13 @@ var inventory_title: Label
 var inventory_status: Label
 var inventory_slots_list: VBoxContainer
 var inventory_bag_list: VBoxContainer
+var map_journal_layer: CanvasLayer
+var map_canvas: ExplorationMap
+var map_page: Control
+var journal_page: Control
+var journal_entries: VBoxContainer
+var map_tab_button: Button
+var journal_tab_button: Button
 
 func _ready() -> void:
 	save_slot_prefix = progress_save_path.get_basename()
@@ -612,12 +670,12 @@ func _build_interface() -> void:
 	experience_bar.custom_minimum_size = Vector2(145, 10)
 	progression.add_child(experience_bar)
 
-	var controls := _make_panel(screen, Rect2(672, 18, 288, 112))
+	var controls := _make_panel(screen, Rect2(672, 18, 288, 150))
 	var controls_content := VBoxContainer.new()
 	controls_content.add_theme_constant_override("separation", 3)
 	controls.add_child(controls_content)
 	controls_content.add_child(_make_label("Move: WASD / Arrows  ·  Interact: E", 11, Color("e8eddb")))
-	controls_content.add_child(_make_label("Battle: 1-5  ·  Bag: I", 11, Color("e8eddb")))
+	controls_content.add_child(_make_label("Battle: 1-5  ·  Bag: I  ·  Map / Journal: M", 11, Color("e8eddb")))
 	var save_controls := HBoxContainer.new()
 	save_controls.add_theme_constant_override("separation", 6)
 	controls_content.add_child(save_controls)
@@ -631,6 +689,13 @@ func _build_interface() -> void:
 	save_controls.add_child(save_menu_button)
 	new_game_button.custom_minimum_size = Vector2(84, 32)
 	save_controls.add_child(new_game_button)
+	var map_controls := HBoxContainer.new()
+	map_controls.add_theme_constant_override("separation", 6)
+	controls_content.add_child(map_controls)
+	var map_button := _make_button("Map / Journal")
+	map_button.custom_minimum_size = Vector2(130, 32)
+	map_button.pressed.connect(_open_map_journal)
+	map_controls.add_child(map_button)
 
 	prompt_panel = _make_panel(screen, Rect2(310, 540, 340, 48))
 	prompt_label = _make_label("", 15, Color("fff0c8"))
@@ -660,6 +725,7 @@ func _build_interface() -> void:
 	_build_save_load_ui(screen)
 	_build_shop_ui(screen)
 	_build_inventory_ui(screen)
+	_build_map_journal_ui(screen)
 	_update_hud()
 
 func _build_hero_creation() -> void:
@@ -848,7 +914,8 @@ func _save_slot_path(slot_index: int) -> String:
 	return "%s_slot_%d.json" % [save_slot_prefix, slot_index + 1]
 
 func _open_save_load_ui() -> void:
-	if creation_layer.visible or shop_layer.visible or inventory_layer.visible or battle_active or dialogue_active:
+	if creation_layer.visible or shop_layer.visible or inventory_layer.visible \
+		or map_journal_layer.visible or battle_active or dialogue_active:
 		return
 	player.set("movement_enabled", false)
 	_update_save_slot_rows()
@@ -983,6 +1050,75 @@ func _build_inventory_ui(screen: Control) -> void:
 	content.add_child(close_button)
 	inventory_layer.hide()
 
+func _build_map_journal_ui(screen: Control) -> void:
+	map_journal_layer = CanvasLayer.new()
+	map_journal_layer.layer = 18
+	add_child(map_journal_layer)
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	map_journal_layer.add_child(overlay)
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.03, 0.06, 0.08, 0.88)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(backdrop)
+	var panel := _make_panel(overlay, Rect2(48, 28, 864, 544))
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+	var title := _make_label("GREENVALE  ·  MAP & JOURNAL", 22, Color("f4e3b8"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(title)
+	var tabs := HBoxContainer.new()
+	tabs.alignment = BoxContainer.ALIGNMENT_CENTER
+	tabs.add_theme_constant_override("separation", 8)
+	content.add_child(tabs)
+	map_tab_button = _make_button("World Map")
+	map_tab_button.pressed.connect(_show_map_page)
+	tabs.add_child(map_tab_button)
+	journal_tab_button = _make_button("Quest Journal")
+	journal_tab_button.pressed.connect(_show_journal_page)
+	tabs.add_child(journal_tab_button)
+	map_page = HBoxContainer.new()
+	map_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	map_page.add_theme_constant_override("separation", 12)
+	content.add_child(map_page)
+	map_canvas = ExplorationMap.new()
+	map_canvas.game = self
+	map_canvas.custom_minimum_size = Vector2(510, 420)
+	map_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map_page.add_child(map_canvas)
+	var legend := VBoxContainer.new()
+	legend.custom_minimum_size.x = 270
+	legend.add_theme_constant_override("separation", 8)
+	map_page.add_child(legend)
+	var legend_title := _make_label("LANDMARKS", 16, Color("f3d890"))
+	legend.add_child(legend_title)
+	var legend_text := _make_label(
+		"Blue: You are here\nGold: Current quest clue or destination\nGreen: Village\nGray: Cave",
+		14,
+		Color("e8eddb")
+	)
+	legend_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	legend.add_child(legend_text)
+	var map_hint := _make_label("The map updates as clues are found and paths open.", 13, Color("b9d1c0"))
+	map_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	legend.add_child(map_hint)
+	journal_page = ScrollContainer.new()
+	journal_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	journal_entries = VBoxContainer.new()
+	journal_entries.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	journal_entries.add_theme_constant_override("separation", 10)
+	journal_page.add_child(journal_entries)
+	content.add_child(journal_page)
+	var close_button := _make_button("Close  ·  M / Esc")
+	close_button.custom_minimum_size = Vector2(220, 38)
+	close_button.pressed.connect(_close_map_journal)
+	content.add_child(close_button)
+	map_journal_layer.hide()
+	_show_map_page()
+
 func _make_shop_list(parent: HBoxContainer, title: String) -> VBoxContainer:
 	var section := VBoxContainer.new()
 	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1014,6 +1150,137 @@ func _close_inventory() -> void:
 	if not creation_layer.visible and not battle_active \
 		and not save_load_layer.visible and not shop_layer.visible:
 		player.set("movement_enabled", true)
+
+func _open_map_journal() -> void:
+	if creation_layer.visible or save_load_layer.visible or shop_layer.visible \
+		or inventory_layer.visible or battle_active or dialogue_active:
+		return
+	player.set("movement_enabled", false)
+	_refresh_journal()
+	map_canvas.queue_redraw()
+	_show_map_page()
+	map_journal_layer.show()
+
+func _close_map_journal() -> void:
+	map_journal_layer.hide()
+	if not creation_layer.visible and not battle_active and not dialogue_active \
+		and not save_load_layer.visible and not shop_layer.visible and not inventory_layer.visible:
+		player.set("movement_enabled", true)
+
+func _show_map_page() -> void:
+	if map_page == null:
+		return
+	map_page.show()
+	journal_page.hide()
+	map_tab_button.disabled = true
+	journal_tab_button.disabled = false
+
+func _show_journal_page() -> void:
+	map_page.hide()
+	journal_page.show()
+	map_tab_button.disabled = false
+	journal_tab_button.disabled = true
+
+func _refresh_journal() -> void:
+	for child in journal_entries.get_children():
+		journal_entries.remove_child(child)
+		child.queue_free()
+	_add_journal_section("MAIN ADVENTURE", [
+		["Speak with Mira", quest_step >= 1, quest_step == 0],
+		["Examine the northern trail evidence", northern_tracks_found or quest_step >= 2, quest_step == 1 and not northern_tracks_found],
+		["Defeat the Forest Shade", quest_step >= 2, quest_step == 1 and northern_tracks_found],
+		["Report to Mira", quest_step >= 3, quest_step == 2],
+		["Study tracks on the southern trail", southern_tracks_found or quest_step >= 4, quest_step == 3 and not southern_tracks_found],
+		["Defeat the Bramble Wolf", quest_step >= 4, quest_step == 3 and southern_tracks_found],
+		["Report to Mira and open the cave path", quest_step >= 5, quest_step == 4]
+	])
+	_add_journal_section("OPTIONAL HUNTER CONTRACT", [
+		["Accept Mira's contract", hunter_contract_stage >= 1, quest_step >= 5 and hunter_contract_stage == 0],
+		["Investigate the scorched earth", hunter_contract_stage >= 2, hunter_contract_stage == 1],
+		["Defeat Ashwing and Forest Shade", hunter_contract_stage >= 3, hunter_contract_stage == 2],
+		["Inspect the stone tracks", hunter_contract_stage >= 4, hunter_contract_stage == 3],
+		["Defeat Thornback and Bramble Wolf", hunter_contract_stage >= 5, hunter_contract_stage == 4],
+		["Report the cleared trails to Mira", hunter_contract_stage >= 6, hunter_contract_stage == 5]
+	])
+	_add_journal_section("OPTIONAL CAVE", [
+		["Unlock and enter the cave", quest_step >= 5, quest_step < 5],
+		["Defeat the Cave Sentinel", cave_guardian_defeated, quest_step >= 5 and not cave_guardian_defeated],
+		["Claim the Crystal Heart", cave_treasure_claimed, cave_guardian_defeated and not cave_treasure_claimed]
+	])
+
+func _add_journal_section(title: String, entries: Array) -> void:
+	var heading := _make_label(title, 16, Color("f3d890"))
+	journal_entries.add_child(heading)
+	for entry in entries:
+		var is_complete: bool = entry[1]
+		var is_active: bool = entry[2]
+		var marker := "✓" if is_complete else "›" if is_active else "·"
+		var color := Color("9bd18c") if is_complete else Color("f3d890") if is_active else Color("98a297")
+		var status := "COMPLETE" if is_complete else "ACTIVE" if is_active else "NOT STARTED"
+		var line := _make_label("%s  %s  —  %s" % [marker, status, entry[0]], 14, color)
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		journal_entries.add_child(line)
+
+func _get_map_markers() -> Array[Dictionary]:
+	var markers: Array[Dictionary] = [
+		{"name": "Greenvale", "position": Vector2(365, 448), "color": Color("83c77b"), "status": "landmark"},
+		{"name": "Mira", "position": npc.global_position, "color": Color("83c77b"), "status": "landmark"},
+		{"name": "Rowan", "position": merchant.global_position, "color": Color("83c77b"), "status": "landmark"}
+	]
+	if quest_step >= 1:
+		markers.append(_map_marker(
+			"North clue", NORTHERN_TRACKS_POSITION,
+			"active" if quest_step == 1 and not northern_tracks_found else "complete"
+		))
+		markers.append(_map_marker(
+			"Shade", CLEARING_POSITION,
+			"active" if quest_step == 1 and northern_tracks_found else "complete" if quest_step >= 2 else "locked"
+		))
+	if quest_step >= 3:
+		markers.append(_map_marker(
+			"South tracks", SOUTHERN_TRACKS_POSITION,
+			"active" if quest_step == 3 and not southern_tracks_found else "complete"
+		))
+		markers.append(_map_marker(
+			"Wolf glade", WOLF_CLEARING_POSITION,
+			"active" if quest_step == 3 and southern_tracks_found else "complete" if quest_step >= 4 else "locked"
+		))
+	if hunter_contract_stage >= 1:
+		markers.append(_map_marker(
+			"Scorch clue", SCORCH_MARKS_POSITION,
+			"active" if hunter_contract_stage == 1 else "complete"
+		))
+	if hunter_contract_stage >= 2:
+		markers.append(_map_marker(
+			"Ashwing", ASHWING_POSITION,
+			"active" if hunter_contract_stage == 2 else "complete"
+		))
+	if hunter_contract_stage >= 3:
+		markers.append(_map_marker(
+			"Stone tracks", STONE_TRACKS_POSITION,
+			"active" if hunter_contract_stage == 3 else "complete"
+		))
+	if hunter_contract_stage >= 4:
+		markers.append(_map_marker(
+			"Thornback", THORNBACK_POSITION,
+			"active" if hunter_contract_stage == 4 else "complete"
+		))
+	if quest_step >= 5:
+		markers.append(_map_marker(
+			"Cave", CAVE_ENTRANCE_POSITION,
+			"complete" if cave_guardian_defeated else "active"
+		))
+	return markers
+
+func _map_marker(marker_name: String, marker_position: Vector2, status: String) -> Dictionary:
+	var color := Color("f3d890") if status == "active" \
+		else Color("93bd80") if status == "complete" else Color("a6aaa0")
+	return {
+		"name": marker_name,
+		"position": marker_position,
+		"color": color,
+		"status": status
+	}
 
 func _refresh_inventory_ui() -> void:
 	_clear_list(inventory_slots_list)
@@ -1392,10 +1659,20 @@ func _process(_delta: float) -> void:
 		_start_battle("guardian")
 
 func _unhandled_input(event: InputEvent) -> void:
+	if map_journal_layer.visible:
+		if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode in [KEY_M, KEY_ESCAPE]:
+			_close_map_journal()
+			get_viewport().set_input_as_handled()
+		return
 	if creation_layer.visible or save_load_layer.visible or shop_layer.visible or inventory_layer.visible:
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_I:
 		_open_inventory()
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
+		_open_map_journal()
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("interact") and not event.is_echo() and not battle_active:
@@ -1410,7 +1687,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _update_prompt() -> void:
-	if battle_active or dialogue_active or shop_layer.visible or inventory_layer.visible:
+	if battle_active or dialogue_active or shop_layer.visible or inventory_layer.visible \
+		or map_journal_layer.visible:
 		prompt_panel.hide()
 		return
 	if player.global_position.distance_to(npc.global_position) < 76.0:
@@ -2028,7 +2306,7 @@ func _default_equipped_slots() -> Dictionary:
 
 func _confirm_new_game() -> void:
 	if creation_layer.visible or save_load_layer.visible or shop_layer.visible \
-		or inventory_layer.visible or battle_active or dialogue_active:
+		or inventory_layer.visible or map_journal_layer.visible or battle_active or dialogue_active:
 		return
 	new_game_dialog.popup_centered()
 
