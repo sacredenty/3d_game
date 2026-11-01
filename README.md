@@ -5,7 +5,8 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 ## Current Playable Slice
 
 - Explore a tile-based village and forest clearing with solid world boundaries, trees, and buildings
-- Talk to Mira, follow the quest objective, and fight a shade with attack, guard, and potion actions
+- Talk to Mira, complete two linked quests, and fight the Forest Shade and Bramble Wolf
+- After restoring peace, explore an optional cave, face the Cave Sentinel's ward, and claim its one-time Crystal Heart reward
 - Earn gold for completing the quest; progress saves between sessions
 - Terrain and character pixel art are generated at runtime as placeholders until source art is added
 
@@ -21,7 +22,8 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - **WASD** or **Arrow Keys**: Move
 - **E**: Talk to Mira / continue dialogue
 - **1-5** (or click): Attack, Ember magic, Guard, Potion, Flee
-- Ember costs 8 MP; shade victories award XP, and leveling up increases HP and MP
+- Ember costs 8 MP; victories award XP, and leveling up increases maximum HP and MP without restoring damage or spent MP
+- Complete Mira's adventure to unlock the cave; interact with the cave entrance, treasure, and exit using **E**
 - **Save / Load**: Open the three-slot save menu; overwriting a used slot requires confirmation
 - Quest, combat, hero, and world position progress auto-save as you play; loaded slots become the active auto-save
 - Use **New Game** on the HUD at any time to start over; confirmation protects the active run, and other save slots remain unchanged

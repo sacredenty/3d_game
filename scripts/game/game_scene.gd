@@ -12,9 +12,13 @@ const SALVE_POSITION := Vector2(880.0, 448.0)
 const CACHE_POSITION := Vector2(1210.0, 390.0)
 const WAYSTONE_POSITION := Vector2(1150.0, 570.0)
 const CAMPFIRE_POSITION := Vector2(1220.0, 660.0)
+const CAVE_ENTRANCE_POSITION := Vector2(1120.0, 800.0)
+const CAVE_EXIT_POSITION := Vector2(1080.0, 800.0)
+const CAVE_GUARDIAN_POSITION := Vector2(920.0, 800.0)
+const CAVE_TREASURE_POSITION := Vector2(840.0, 800.0)
 const PLAYER_MAX_HP := 100
 const PROGRESS_SAVE_PATH := "user://greenvale_progress.json"
-const SAVE_VERSION := 6
+const SAVE_VERSION := 7
 const SAVE_SLOT_COUNT := 3
 const STARTING_MP := 30
 const DEFAULT_HERO_NAME := "Adventurer"
@@ -22,6 +26,7 @@ const DEFAULT_HERO_CLASS := "Warrior"
 
 var player: CharacterBody2D
 var npc: StaticBody2D
+var cave_seal: CollisionShape2D
 var world_tiles: TileMapLayer
 var tree_positions: Array[Vector2] = []
 var tree_texture: Texture2D
@@ -46,6 +51,9 @@ var gold: int = 0
 var salve_collected: bool = false
 var cache_opened: bool = false
 var waystone_discovered: bool = false
+var in_cave: bool = false
+var cave_guardian_defeated: bool = false
+var cave_treasure_claimed: bool = false
 var progress_save_path: String = PROGRESS_SAVE_PATH
 var battle_instance: Node
 var active_encounter: String = ""
@@ -128,9 +136,21 @@ func _build_world() -> void:
 	_add_world_marker(CACHE_POSITION, "cache")
 	_add_world_marker(WAYSTONE_POSITION, "waystone")
 	_add_world_marker(CAMPFIRE_POSITION, "campfire")
+	_add_world_marker(CAVE_ENTRANCE_POSITION, "cave")
+	_add_cave_walls()
+
+func _add_cave_walls() -> void:
+	_add_rect_obstacle(Vector2(960, 688), Vector2(336, 32))
+	_add_rect_obstacle(Vector2(792, 808), Vector2(32, 272))
+	_add_rect_obstacle(Vector2(960, 936), Vector2(336, 32))
+	_add_rect_obstacle(Vector2(1120, 736), Vector2(32, 64))
+	_add_rect_obstacle(Vector2(1120, 872), Vector2(32, 112))
+	cave_seal = _add_rect_obstacle(Vector2(1120, 800), Vector2(32, 64))
 
 func _is_path_position(position: Vector2) -> bool:
 	if position.x < 1140.0 and position.y > 368.0 and position.y < 544.0:
+		return true
+	if Rect2(808, 704, 304, 224).has_point(position):
 		return true
 	return position.distance_to(CLEARING_POSITION) < 150.0 \
 		or (position.x > 1120.0 and position.y > 544.0 and position.y < 820.0) \
@@ -141,7 +161,7 @@ func _is_building_position(position: Vector2) -> bool:
 		or Rect2(360, 165, 192, 180).has_point(position) \
 		or Rect2(296, 328, 102, 82).has_point(position)
 
-func _add_rect_obstacle(position: Vector2, size: Vector2) -> void:
+func _add_rect_obstacle(position: Vector2, size: Vector2) -> CollisionShape2D:
 	var body := StaticBody2D.new()
 	body.position = position
 	var shape := RectangleShape2D.new()
@@ -150,6 +170,7 @@ func _add_rect_obstacle(position: Vector2, size: Vector2) -> void:
 	collision.shape = shape
 	body.add_child(collision)
 	add_child(body)
+	return collision
 
 func _add_circle_obstacle(position: Vector2, radius: float) -> void:
 	var body := StaticBody2D.new()
@@ -234,6 +255,8 @@ func _paint_world() -> void:
 				source = Vector2i(2, 1) if position.distance_to(CLEARING_POSITION) < 82.0 else Vector2i(3, 0)
 			if position.distance_to(WOLF_CLEARING_POSITION) < 128.0:
 				source = Vector2i(2, 1) if position.distance_to(WOLF_CLEARING_POSITION) < 82.0 else Vector2i(3, 0)
+			if Rect2(808, 704, 304, 224).has_point(position):
+				source = Vector2i(7, 1)
 			if _is_building_position(position):
 				source = Vector2i(5, 1)
 			world_tiles.set_cell(Vector2i(x, y), 0, source)
@@ -314,6 +337,12 @@ func _make_marker_texture(marker: String) -> Texture2D:
 			_pixel(image, 11, 11, 3, 4, Color("f8d36b"))
 			_pixel(image, 5, 20, 3, 2, Color("d1b987"))
 			_pixel(image, 16, 20, 3, 2, Color("d1b987"))
+		"cave":
+			_pixel(image, 2, 13, 20, 10, Color("443d39"))
+			_pixel(image, 4, 8, 16, 12, Color("696258"))
+			_pixel(image, 7, 12, 10, 9, Color("171b20"))
+			_pixel(image, 9, 14, 6, 8, Color("111519"))
+			_pixel(image, 3, 21, 18, 3, Color("a89a76"))
 	return ImageTexture.create_from_image(image)
 
 func _add_house(position: Vector2, roof_color: Color, wall_color: Color) -> void:
@@ -871,6 +900,9 @@ func _process(_delta: float) -> void:
 		_start_battle("shade")
 	elif quest_step == 3 and not encounter_started and player.global_position.distance_to(WOLF_CLEARING_POSITION) < 76.0:
 		_start_battle("wolf")
+	elif in_cave and not cave_guardian_defeated and not encounter_started \
+		and player.global_position.distance_to(CAVE_GUARDIAN_POSITION) < 64.0:
+		_start_battle("guardian")
 
 func _unhandled_input(event: InputEvent) -> void:
 	if creation_layer.visible or save_load_layer.visible:
@@ -903,6 +935,15 @@ func _update_prompt() -> void:
 	elif _near_world_object(CAMPFIRE_POSITION):
 		prompt_label.text = "E  Rest at the campfire"
 		prompt_panel.show()
+	elif in_cave and _near_world_object(CAVE_EXIT_POSITION):
+		prompt_label.text = "E  Leave the cave"
+		prompt_panel.show()
+	elif in_cave and _near_world_object(CAVE_TREASURE_POSITION) and cave_guardian_defeated and not cave_treasure_claimed:
+		prompt_label.text = "E  Claim the crystal heart"
+		prompt_panel.show()
+	elif not in_cave and _near_world_object(CAVE_ENTRANCE_POSITION):
+		prompt_label.text = "E  Enter the cave" if quest_step >= 5 else "The cave is sealed until Greenvale is safe."
+		prompt_panel.show()
 	elif quest_step == 1 and player.global_position.distance_to(CLEARING_POSITION) < 210.0:
 		prompt_label.text = "The shade's clearing is just ahead..."
 		prompt_panel.show()
@@ -916,7 +957,20 @@ func _near_world_object(position: Vector2) -> bool:
 	return player.global_position.distance_to(position) < 72.0
 
 func _interact_with_world() -> void:
-	if _near_world_object(SALVE_POSITION) and not salve_collected:
+	if in_cave and _near_world_object(CAVE_EXIT_POSITION):
+		in_cave = false
+		player.global_position = CAVE_ENTRANCE_POSITION + Vector2(56, 0)
+		_show_notice("You leave the cave and return to the forest trail.")
+	elif in_cave and _near_world_object(CAVE_TREASURE_POSITION) and cave_guardian_defeated and not cave_treasure_claimed:
+		cave_treasure_claimed = true
+		hero_spirit = mini(hero_spirit + 2, 30)
+		player_mp = mini(player_mp + 4, max_mp())
+		_show_notice("The crystal heart settles into your pack. Spirit increased by 2.")
+	elif not in_cave and _near_world_object(CAVE_ENTRANCE_POSITION) and quest_step >= 5:
+		in_cave = true
+		player.global_position = CAVE_EXIT_POSITION
+		_show_notice("You enter the old cave. Something stirs in the darkness.")
+	elif _near_world_object(SALVE_POSITION) and not salve_collected:
 		salve_collected = true
 		potions += 1
 		_sync_exploration_markers()
@@ -1018,18 +1072,25 @@ func _start_battle(encounter: String) -> void:
 	active_encounter = encounter
 	player.set("movement_enabled", false)
 	var enemy: Dictionary
-	if encounter == "wolf":
-		enemy = {
-			"name": "Bramble Wolf", "hp": 164, "damage": Vector2i(13, 19),
-			"xp": 130, "color": Color("a96f58"), "weakness": "physical",
-			"intents": PackedStringArray(["Quick bite", "Heavy pounce", "Quick bite"])
-		}
-	else:
-		enemy = {
-			"name": "Forest Shade", "hp": 112, "damage": Vector2i(10, 15),
-			"xp": 80, "color": Color("647b9a"), "weakness": "fire",
-			"intents": PackedStringArray(["Heavy strike", "Shadow swipe", "Shadow swipe"])
-		}
+	match encounter:
+		"wolf":
+			enemy = {
+				"name": "Bramble Wolf", "hp": 164, "damage": Vector2i(13, 19),
+				"xp": 130, "color": Color("a96f58"), "weakness": "physical",
+				"intents": PackedStringArray(["Quick bite", "Heavy pounce", "Quick bite"])
+			}
+		"guardian":
+			enemy = {
+				"name": "Cave Sentinel", "hp": 148, "damage": Vector2i(12, 17),
+				"xp": 115, "color": Color("817f74"), "weakness": "fire",
+				"intents": PackedStringArray(["Heavy slam", "Stone ward", "Shard throw"])
+			}
+		_:
+			enemy = {
+				"name": "Forest Shade", "hp": 112, "damage": Vector2i(10, 15),
+				"xp": 80, "color": Color("647b9a"), "weakness": "fire",
+				"intents": PackedStringArray(["Heavy strike", "Shadow swipe", "Shadow swipe"])
+			}
 	battle_instance = BATTLE_SCENE.instantiate()
 	add_child(battle_instance)
 	battle_instance.connect("finished", _on_battle_finished)
@@ -1047,15 +1108,27 @@ func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, e
 	battle_active = false
 	player.set("movement_enabled", true)
 	if outcome == "victory":
-		quest_step = 2 if active_encounter == "shade" else 4
+		encounter_started = false
+		match active_encounter:
+			"shade":
+				quest_step = 2
+			"wolf":
+				quest_step = 4
+			"guardian":
+				cave_guardian_defeated = true
 		_award_experience(experience)
 	elif outcome == "flee":
 		encounter_started = false
-		player.position = Vector2(560, 448)
+		if active_encounter == "guardian":
+			in_cave = true
+			player.position = CAVE_EXIT_POSITION
+		else:
+			player.position = Vector2(560, 448)
 	else:
 		player_hp = max_hp()
 		player_mp = max_mp()
 		encounter_started = false
+		in_cave = false
 		player.position = Vector2(250, 448)
 	active_encounter = ""
 	var save_error := save_progress(progress_save_path)
@@ -1068,6 +1141,7 @@ func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, e
 func _update_hud() -> void:
 	if objective_label == null:
 		return
+	cave_seal.disabled = quest_step >= 5
 	hero_identity_label.text = "%s  ·  %s" % [hero_name, hero_class]
 	match quest_step:
 		0:
@@ -1112,7 +1186,10 @@ func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 		"position_y": player.global_position.y,
 		"salve_collected": salve_collected,
 		"cache_opened": cache_opened,
-		"waystone_discovered": waystone_discovered
+		"waystone_discovered": waystone_discovered,
+		"in_cave": in_cave,
+		"cave_guardian_defeated": cave_guardian_defeated,
+		"cave_treasure_claimed": cave_treasure_claimed
 	}))
 	var write_error := file.get_error()
 	file.close()
@@ -1176,6 +1253,13 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	):
 		push_error("Greenvale save is missing a valid hero position.")
 		return false
+	if int(save_version) >= 7 and (
+		typeof(parsed.get("in_cave")) != TYPE_BOOL \
+		or typeof(parsed.get("cave_guardian_defeated")) != TYPE_BOOL \
+		or typeof(parsed.get("cave_treasure_claimed")) != TYPE_BOOL
+	):
+		push_error("Greenvale save is missing valid cave progress.")
+		return false
 
 	quest_step = clampi(int(parsed["quest_step"]), 0, 5)
 	if int(save_version) < 3 and quest_step == 2:
@@ -1195,6 +1279,9 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	salve_collected = bool(parsed.get("salve_collected", false))
 	cache_opened = bool(parsed.get("cache_opened", false))
 	waystone_discovered = bool(parsed.get("waystone_discovered", false))
+	in_cave = bool(parsed.get("in_cave", false))
+	cave_guardian_defeated = bool(parsed.get("cave_guardian_defeated", false))
+	cave_treasure_claimed = bool(parsed.get("cave_treasure_claimed", false))
 	if int(save_version) >= 6:
 		player.global_position = Vector2(
 			clampf(float(parsed["position_x"]), 24.0, WORLD_SIZE.x - 24.0),
@@ -1218,8 +1305,6 @@ func _award_experience(amount: int) -> bool:
 	while player_level < 99 and player_experience >= experience_to_next_level():
 		player_experience -= experience_to_next_level()
 		player_level += 1
-		player_hp = max_hp()
-		player_mp = max_mp()
 		leveled_up = true
 	if player_level == 99:
 		player_experience = mini(player_experience, experience_to_next_level() - 1)
@@ -1256,6 +1341,9 @@ func _start_fresh_game() -> void:
 	salve_collected = false
 	cache_opened = false
 	waystone_discovered = false
+	in_cave = false
+	cave_guardian_defeated = false
+	cave_treasure_claimed = false
 	encounter_started = false
 	battle_active = false
 	dialogue_active = false

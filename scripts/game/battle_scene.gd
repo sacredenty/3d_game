@@ -11,6 +11,7 @@ var enemy_color := Color("647b9a")
 var weakness: String = "fire"
 var intent_pattern: PackedStringArray = PackedStringArray(["Heavy strike", "Shadow swipe", "Shadow swipe"])
 var intent_index: int = 0
+var enemy_warding: bool = false
 var player_hp: int = 100
 var player_mp: int = 30
 var player_level: int = 1
@@ -28,6 +29,7 @@ var battle_outcome: String = ""
 var layer: CanvasLayer
 var enemy_hp_bar: ProgressBar
 var enemy_title: Label
+var battle_title: Label
 var intent_label: Label
 var weakness_label: Label
 var enemy_art: TextureRect
@@ -69,6 +71,7 @@ func start_battle(
 	weakness = foe_weakness
 	intent_pattern = foe_intents
 	intent_index = 0
+	enemy_warding = false
 	player_hp = current_hp
 	player_mp = current_mp
 	player_level = level
@@ -82,6 +85,7 @@ func start_battle(
 	active = true
 	battle_outcome = ""
 	enemy_art.texture = _make_enemy_texture(enemy_color)
+	battle_title.text = "CAVE ENCOUNTER" if enemy_name == "Cave Sentinel" else "FOREST ENCOUNTER"
 	_update_ui()
 	battle_log.text = "Choose an action. Watch the enemy's intent."
 	actions.show()
@@ -120,7 +124,8 @@ func _build_ui() -> void:
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 9)
 	panel.add_child(content)
-	content.add_child(_make_label("FOREST ENCOUNTER", 13, Color("c1d0c0")))
+	battle_title = _make_label("", 13, Color("c1d0c0"))
+	content.add_child(battle_title)
 	player_status = _make_label("", 15, Color("c1d0c0"))
 	player_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(player_status)
@@ -239,12 +244,8 @@ func _attack() -> void:
 	if hero_class == "Warrior":
 		damage += 4
 	damage = maxi(damage, 1)
-	var weakness_message := ""
-	if weakness == "physical":
-		damage = ceili(damage * 1.5)
-		weakness_message = " Weakness!"
-	enemy_hp = maxi(enemy_hp - damage, 0)
-	_action_message("You attack %s for %d damage.%s" % [enemy_name, damage, weakness_message])
+	var damage_result := _damage_enemy(damage, "physical", "You attack %s for %d damage")
+	_action_message(damage_result)
 	_after_player_action()
 
 func _cast_magic() -> void:
@@ -254,12 +255,8 @@ func _cast_magic() -> void:
 	var damage := 18 + hero_spirit * 2 + (player_level - 1) * 4
 	if hero_class == "Mage":
 		damage += 8
-	var weakness_message := ""
-	if weakness == "fire":
-		damage = ceili(damage * 1.5)
-		weakness_message = " Weakness!"
-	enemy_hp = maxi(enemy_hp - damage, 0)
-	_action_message("Ember hits %s for %d damage.%s (-8 MP)" % [enemy_name, damage, weakness_message])
+	var damage_result := _damage_enemy(damage, "fire", "Ember hits %s for %d damage")
+	_action_message("%s (-8 MP)" % damage_result)
 	_after_player_action()
 
 func _guard() -> void:
@@ -299,6 +296,13 @@ func _after_player_action() -> void:
 		return
 	var damage := randi_range(enemy_damage.x, enemy_damage.y) + (player_level - 1) * 2
 	var intent := _current_intent()
+	if intent == "Stone ward":
+		enemy_warding = true
+		battle_log.text += "\n%s raises a stone ward. Its next hit will be reduced." % enemy_name
+		if not intent_pattern.is_empty():
+			intent_index = (intent_index + 1) % intent_pattern.size()
+		_update_ui()
+		return
 	if intent.begins_with("Heavy"):
 		damage = ceili(damage * 1.65)
 	if guarding:
@@ -352,7 +356,8 @@ func _update_ui() -> void:
 	if enemy_title != null:
 		enemy_title.text = "%s  ·  %d HP" % [enemy_name, enemy_hp]
 	if intent_label != null:
-		intent_label.text = "Intent: %s" % _current_intent()
+		intent_label.text = "Enemy warded  ·  Intent: %s" % _current_intent() if enemy_warding \
+			else "Intent: %s" % _current_intent()
 	if weakness_label != null:
 		weakness_label.text = "Weak to Ember" if weakness == "fire" else "Weak to physical attacks"
 
@@ -360,6 +365,19 @@ func _current_intent() -> String:
 	if intent_pattern.is_empty():
 		return "Strike"
 	return intent_pattern[intent_index]
+
+func _damage_enemy(base_damage: int, damage_kind: String, message_format: String) -> String:
+	var damage := base_damage
+	var weakness_message := ""
+	if weakness == damage_kind:
+		damage = ceili(damage * 1.5)
+		weakness_message = " Weakness!"
+	if enemy_warding:
+		damage = ceili(damage * 0.5)
+		enemy_warding = false
+		weakness_message += " The ward absorbs part of the blow."
+	enemy_hp = maxi(enemy_hp - damage, 0)
+	return "%s.%s" % [message_format % [enemy_name, damage], weakness_message]
 
 func _dodge_chance() -> int:
 	return mini(hero_agility * 2, 40) if hero_class == "Rogue" else 0
