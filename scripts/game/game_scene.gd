@@ -14,8 +14,11 @@ const WAYSTONE_POSITION := Vector2(1150.0, 570.0)
 const CAMPFIRE_POSITION := Vector2(1220.0, 660.0)
 const PLAYER_MAX_HP := 100
 const PROGRESS_SAVE_PATH := "user://greenvale_progress.json"
-const SAVE_VERSION := 4
+const SAVE_VERSION := 6
+const SAVE_SLOT_COUNT := 3
 const STARTING_MP := 30
+const DEFAULT_HERO_NAME := "Adventurer"
+const DEFAULT_HERO_CLASS := "Warrior"
 
 var player: CharacterBody2D
 var npc: StaticBody2D
@@ -32,6 +35,12 @@ var player_hp: int = PLAYER_MAX_HP
 var player_mp: int = STARTING_MP
 var player_level: int = 1
 var player_experience: int = 0
+var hero_name: String = DEFAULT_HERO_NAME
+var hero_class: String = DEFAULT_HERO_CLASS
+var hero_vitality: int = 13
+var hero_strength: int = 10
+var hero_spirit: int = 12
+var hero_agility: int = 10
 var potions: int = 0
 var gold: int = 0
 var salve_collected: bool = false
@@ -41,9 +50,11 @@ var progress_save_path: String = PROGRESS_SAVE_PATH
 var battle_instance: Node
 var active_encounter: String = ""
 var exploration_markers: Dictionary = {}
+var save_slot_prefix: String = ""
 
 var hud_layer: CanvasLayer
 var objective_label: Label
+var hero_identity_label: Label
 var hp_bar: ProgressBar
 var mp_bar: ProgressBar
 var experience_bar: ProgressBar
@@ -56,13 +67,30 @@ var dialogue_label: Label
 var dialogue_hint: Label
 var new_game_button: Button
 var new_game_dialog: ConfirmationDialog
+var creation_layer: CanvasLayer
+var hero_name_input: LineEdit
+var hero_class_picker: OptionButton
+var hero_stats_label: Label
+var begin_adventure_button: Button
+var save_load_layer: CanvasLayer
+var save_load_title: Label
+var save_slot_rows: Array[HBoxContainer] = []
+var save_slot_labels: Array[Label] = []
+var save_slot_load_buttons: Array[Button] = []
+var save_overwrite_dialog: ConfirmationDialog
+var pending_save_slot: int = -1
 
 func _ready() -> void:
+	save_slot_prefix = progress_save_path.get_basename()
 	_build_world()
 	_build_player()
 	_build_npc()
 	_build_interface()
-	load_progress(progress_save_path)
+	if FileAccess.file_exists(progress_save_path):
+		load_progress(progress_save_path)
+		_update_player_appearance()
+	else:
+		_begin_hero_creation()
 	_sync_exploration_markers()
 	_update_hud()
 
@@ -365,6 +393,26 @@ func _build_player() -> void:
 	camera.limit_bottom = int(WORLD_SIZE.y)
 	player.add_child(camera)
 	add_child(player)
+	_update_player_appearance()
+
+func _update_player_appearance() -> void:
+	if player == null:
+		return
+	var coat := Color("b78c45")
+	var hair := Color("594333")
+	var trim := Color("e5cf86")
+	match hero_class:
+		"Mage":
+			coat = Color("536f91")
+			hair = Color("4a3b37")
+			trim = Color("9bc8dd")
+		"Rogue":
+			coat = Color("55734e")
+			hair = Color("3b332b")
+			trim = Color("c2b16d")
+	var sprite := player.get_node_or_null("CharacterSprite") as Sprite2D
+	if sprite != null:
+		sprite.texture = _make_character_texture(coat, hair, trim)
 
 func _build_npc() -> void:
 	npc = StaticBody2D.new()
@@ -402,12 +450,14 @@ func _build_interface() -> void:
 	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(screen)
 
-	var hud := _make_panel(screen, Rect2(18, 18, 474, 174))
+	var hud := _make_panel(screen, Rect2(18, 18, 474, 192))
 	var hud_content := VBoxContainer.new()
 	hud_content.add_theme_constant_override("separation", 6)
 	hud.add_child(hud_content)
 	var title := _make_label("CHRONO CHRONICLES  /  GREENVALE", 18, Color("f4e3b8"))
 	hud_content.add_child(title)
+	hero_identity_label = _make_label("", 13, Color("f3d890"))
+	hud_content.add_child(hero_identity_label)
 	objective_label = _make_label("", 15, Color("e8eddb"))
 	objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hud_content.add_child(objective_label)
@@ -427,11 +477,9 @@ func _build_interface() -> void:
 	gold_label = _make_label("0 G", 14, Color("f0cf75"))
 	stats.add_child(gold_label)
 	new_game_button = _make_button("New Game")
-	new_game_button.custom_minimum_size = Vector2(74, 28)
+	new_game_button.custom_minimum_size = Vector2(88, 34)
 	new_game_button.add_theme_font_size_override("font_size", 12)
 	new_game_button.pressed.connect(_confirm_new_game)
-	new_game_button.hide()
-	stats.add_child(new_game_button)
 
 	var progression := HBoxContainer.new()
 	progression.add_theme_constant_override("separation", 8)
@@ -442,9 +490,21 @@ func _build_interface() -> void:
 	experience_bar.custom_minimum_size = Vector2(230, 14)
 	progression.add_child(experience_bar)
 
-	var controls := _make_panel(screen, Rect2(744, 18, 212, 76))
-	var controls_label := _make_label("WASD / Arrows  Move\nE  Talk  ·  1-5 Battle", 14, Color("e8eddb"))
-	controls.add_child(controls_label)
+	var controls := _make_panel(screen, Rect2(744, 18, 212, 150))
+	var controls_content := VBoxContainer.new()
+	controls_content.add_theme_constant_override("separation", 6)
+	controls.add_child(controls_content)
+	controls_content.add_child(_make_label("WASD / Arrows  Move", 13, Color("e8eddb")))
+	controls_content.add_child(_make_label("E  Talk  ·  1-5 Battle", 13, Color("e8eddb")))
+	var save_controls := HBoxContainer.new()
+	save_controls.add_theme_constant_override("separation", 6)
+	controls_content.add_child(save_controls)
+	var save_menu_button := _make_button("Save / Load")
+	save_menu_button.custom_minimum_size = Vector2(94, 34)
+	save_menu_button.pressed.connect(_open_save_load_ui)
+	save_controls.add_child(save_menu_button)
+	new_game_button.custom_minimum_size = Vector2(94, 34)
+	save_controls.add_child(new_game_button)
 
 	prompt_panel = _make_panel(screen, Rect2(310, 540, 340, 48))
 	prompt_label = _make_label("", 15, Color("fff0c8"))
@@ -466,11 +526,285 @@ func _build_interface() -> void:
 
 	new_game_dialog = ConfirmationDialog.new()
 	new_game_dialog.title = "Start a new game?"
-	new_game_dialog.dialog_text = "This will replace your saved Greenvale progress."
+	new_game_dialog.dialog_text = "Start over as a new hero? This replaces the current run in its active save."
 	new_game_dialog.ok_button_text = "Start New Game"
 	new_game_dialog.confirmed.connect(_start_fresh_game)
 	screen.add_child(new_game_dialog)
+	_build_hero_creation()
+	_build_save_load_ui(screen)
 	_update_hud()
+
+func _build_hero_creation() -> void:
+	creation_layer = CanvasLayer.new()
+	creation_layer.layer = 20
+	add_child(creation_layer)
+	var screen := Control.new()
+	screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	screen.mouse_filter = Control.MOUSE_FILTER_STOP
+	creation_layer.add_child(screen)
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.03, 0.06, 0.08, 0.9)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	screen.add_child(backdrop)
+	var panel := _make_panel(screen, Rect2(140, 50, 680, 500))
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 13)
+	panel.add_child(content)
+	var title := _make_label("CREATE YOUR HERO", 25, Color("f4e3b8"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(title)
+	content.add_child(_make_label("Choose a name and calling. Roll stats until they feel right.", 15, Color("d5ddcf")))
+	hero_name_input = LineEdit.new()
+	hero_name_input.placeholder_text = "Hero name"
+	hero_name_input.text = DEFAULT_HERO_NAME
+	hero_name_input.max_length = 16
+	hero_name_input.custom_minimum_size.y = 40
+	content.add_child(hero_name_input)
+	var class_row := HBoxContainer.new()
+	class_row.add_theme_constant_override("separation", 12)
+	class_row.add_child(_make_label("Class", 16, Color("f3d890")))
+	hero_class_picker = OptionButton.new()
+	hero_class_picker.add_item("Warrior")
+	hero_class_picker.add_item("Mage")
+	hero_class_picker.add_item("Rogue")
+	hero_class_picker.item_selected.connect(_on_hero_class_selected)
+	class_row.add_child(hero_class_picker)
+	content.add_child(class_row)
+	hero_stats_label = _make_label("", 16, Color("e8eddb"))
+	hero_stats_label.custom_minimum_size.y = 100
+	content.add_child(hero_stats_label)
+	var explanation := _make_label(
+		"Warriors endure and brace better. Mages amplify Ember. Rogues can evade enemy attacks.",
+		14, Color("b9d1c0")
+	)
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(explanation)
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	buttons.add_theme_constant_override("separation", 16)
+	content.add_child(buttons)
+	var reroll_button := _make_button("Roll Stats")
+	reroll_button.pressed.connect(_roll_hero_stats)
+	buttons.add_child(reroll_button)
+	begin_adventure_button = _make_button("Begin Adventure")
+	begin_adventure_button.pressed.connect(_confirm_hero_creation)
+	buttons.add_child(begin_adventure_button)
+	creation_layer.hide()
+
+func _begin_hero_creation() -> void:
+	hero_name_input.text = DEFAULT_HERO_NAME
+	hero_class_picker.select(0)
+	hero_class = DEFAULT_HERO_CLASS
+	_update_player_appearance()
+	_roll_hero_stats()
+	player.set("movement_enabled", false)
+	creation_layer.show()
+
+func _on_hero_class_selected(index: int) -> void:
+	hero_class = hero_class_picker.get_item_text(index)
+	_update_player_appearance()
+	_roll_hero_stats()
+
+func _roll_hero_stats() -> void:
+	var ranges: Dictionary
+	match hero_class:
+		"Mage":
+			ranges = {
+				"vitality": Vector2i(8, 12), "strength": Vector2i(5, 9),
+				"spirit": Vector2i(14, 18), "agility": Vector2i(8, 12)
+			}
+		"Rogue":
+			ranges = {
+				"vitality": Vector2i(10, 14), "strength": Vector2i(10, 14),
+				"spirit": Vector2i(8, 12), "agility": Vector2i(14, 18)
+			}
+		_:
+			ranges = {
+				"vitality": Vector2i(14, 18), "strength": Vector2i(13, 17),
+				"spirit": Vector2i(6, 10), "agility": Vector2i(6, 10)
+			}
+	hero_vitality = randi_range(ranges["vitality"].x, ranges["vitality"].y)
+	hero_strength = randi_range(ranges["strength"].x, ranges["strength"].y)
+	hero_spirit = randi_range(ranges["spirit"].x, ranges["spirit"].y)
+	hero_agility = randi_range(ranges["agility"].x, ranges["agility"].y)
+	_update_hero_stats_label()
+
+func _update_hero_stats_label() -> void:
+	hero_stats_label.text = "%s  ·  HP %d  ·  MP %d\nVitality %d    Strength %d    Spirit %d    Agility %d\n\nClass traits: %s" % [
+		hero_class, max_hp(), max_mp(), hero_vitality, hero_strength, hero_spirit, hero_agility,
+		_get_class_trait()
+	]
+
+func _get_class_trait() -> String:
+	match hero_class:
+		"Mage":
+			return "Ember deals increased damage."
+		"Rogue":
+			return "Agility gives a chance to dodge attacks."
+		_:
+			return "Higher HP and stronger Guard."
+
+func _confirm_hero_creation() -> void:
+	var entered_name := hero_name_input.text.strip_edges()
+	if entered_name.is_empty():
+		hero_name_input.placeholder_text = "Please enter a name"
+		return
+	hero_name = entered_name
+	player_hp = max_hp()
+	player_mp = max_mp()
+	_update_player_appearance()
+	player.set("movement_enabled", true)
+	creation_layer.hide()
+	var save_error := save_progress(progress_save_path)
+	if save_error != OK:
+		push_error("Could not save Greenvale progress: %s" % error_string(save_error))
+	_update_hud()
+
+func _build_save_load_ui(screen: Control) -> void:
+	save_load_layer = CanvasLayer.new()
+	save_load_layer.layer = 15
+	add_child(save_load_layer)
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	save_load_layer.add_child(overlay)
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.03, 0.06, 0.08, 0.82)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(backdrop)
+	var panel := _make_panel(overlay, Rect2(100, 110, 760, 360))
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 14)
+	panel.add_child(content)
+	save_load_title = _make_label("SAVE / LOAD ADVENTURE", 22, Color("f4e3b8"))
+	save_load_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(save_load_title)
+	content.add_child(_make_label("Saving stores the current hero and world progress in that slot.", 14, Color("d5ddcf")))
+	save_slot_rows.clear()
+	save_slot_labels.clear()
+	save_slot_load_buttons.clear()
+	for slot_index in range(SAVE_SLOT_COUNT):
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		content.add_child(row)
+		var slot_label := _make_label("", 14, Color("e8eddb"))
+		slot_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(slot_label)
+		var save_button := _make_button("Save")
+		save_button.custom_minimum_size = Vector2(100, 36)
+		save_button.pressed.connect(_request_save_slot.bind(slot_index))
+		row.add_child(save_button)
+		var load_button := _make_button("Load")
+		load_button.custom_minimum_size = Vector2(100, 36)
+		load_button.pressed.connect(_load_slot.bind(slot_index))
+		row.add_child(load_button)
+		save_slot_rows.append(row)
+		save_slot_labels.append(slot_label)
+		save_slot_load_buttons.append(load_button)
+	var close_button := _make_button("Return to Game")
+	close_button.custom_minimum_size = Vector2(220, 38)
+	close_button.pressed.connect(_close_save_load_ui)
+	content.add_child(close_button)
+	save_overwrite_dialog = ConfirmationDialog.new()
+	save_overwrite_dialog.title = "Overwrite save?"
+	save_overwrite_dialog.dialog_text = "This save slot already contains progress."
+	save_overwrite_dialog.ok_button_text = "Overwrite"
+	save_overwrite_dialog.confirmed.connect(_confirm_save_slot)
+	save_overwrite_dialog.canceled.connect(_cancel_save_overwrite)
+	overlay.add_child(save_overwrite_dialog)
+	save_load_layer.hide()
+
+func _save_slot_path(slot_index: int) -> String:
+	return "%s_slot_%d.json" % [save_slot_prefix, slot_index + 1]
+
+func _open_save_load_ui() -> void:
+	if creation_layer.visible or battle_active or dialogue_active:
+		return
+	player.set("movement_enabled", false)
+	_update_save_slot_rows()
+	save_load_layer.show()
+
+func _close_save_load_ui() -> void:
+	save_load_layer.hide()
+	if not creation_layer.visible and not battle_active:
+		player.set("movement_enabled", true)
+
+func _update_save_slot_rows() -> void:
+	for slot_index in range(SAVE_SLOT_COUNT):
+		var summary := _read_save_slot_summary(_save_slot_path(slot_index))
+		save_slot_labels[slot_index].text = "Slot %d  ·  %s" % [slot_index + 1, summary["text"]]
+		save_slot_load_buttons[slot_index].disabled = not summary["valid"]
+
+func _read_save_slot_summary(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {"text": "Empty", "valid": false}
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		push_error("Could not read save slot: %s" % error_string(FileAccess.get_open_error()))
+		return {"text": "Unreadable", "valid": false}
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not parsed is Dictionary or not _is_saved_integer(parsed.get("version")) \
+		or int(parsed["version"]) < 1 or int(parsed["version"]) > SAVE_VERSION:
+		return {"text": "Invalid save", "valid": false}
+	var saved_name := str(parsed.get("hero_name", DEFAULT_HERO_NAME)).strip_edges()
+	var saved_class := str(parsed.get("hero_class", DEFAULT_HERO_CLASS))
+	var saved_level: Variant = parsed.get("player_level", 1)
+	var saved_quest: Variant = parsed.get("quest_step", 0)
+	if not _is_saved_integer(saved_level) or not _is_saved_integer(saved_quest):
+		return {"text": "Invalid save", "valid": false}
+	return {
+		"text": "%s the %s  ·  Lv %d  ·  Quest %d" % [
+			saved_name, saved_class, int(saved_level), int(saved_quest)
+		],
+		"valid": true
+	}
+
+func _request_save_slot(slot_index: int) -> void:
+	pending_save_slot = slot_index
+	if FileAccess.file_exists(_save_slot_path(slot_index)):
+		save_overwrite_dialog.dialog_text = "Overwrite Slot %d? Its current hero progress will be replaced." % (slot_index + 1)
+		save_overwrite_dialog.popup_centered()
+	else:
+		_confirm_save_slot()
+
+func _confirm_save_slot() -> void:
+	if pending_save_slot < 0 or pending_save_slot >= SAVE_SLOT_COUNT:
+		return
+	var path := _save_slot_path(pending_save_slot)
+	var save_error := save_progress(path)
+	if save_error != OK:
+		push_error("Could not save hero to slot %d: %s" % [pending_save_slot + 1, error_string(save_error)])
+		save_load_title.text = "SAVE FAILED"
+		return
+	progress_save_path = path
+	save_load_title.text = "SAVED  ·  %s the %s" % [hero_name, hero_class]
+	_update_save_slot_rows()
+	pending_save_slot = -1
+
+func _cancel_save_overwrite() -> void:
+	pending_save_slot = -1
+
+func _load_slot(slot_index: int) -> void:
+	if slot_index < 0 or slot_index >= SAVE_SLOT_COUNT:
+		return
+	var path := _save_slot_path(slot_index)
+	if not load_progress(path):
+		save_load_title.text = "LOAD FAILED  ·  Save data could not be loaded."
+		_update_save_slot_rows()
+		return
+	progress_save_path = path
+	encounter_started = false
+	battle_active = false
+	dialogue_active = false
+	dialogue_panel.hide()
+	prompt_panel.hide()
+	_update_player_appearance()
+	_sync_exploration_markers()
+	_update_hud()
+	_close_save_load_ui()
 
 func _make_panel(parent: Control, rect: Rect2) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -539,6 +873,8 @@ func _process(_delta: float) -> void:
 		_start_battle("wolf")
 
 func _unhandled_input(event: InputEvent) -> void:
+	if creation_layer.visible or save_load_layer.visible:
+		return
 	if event.is_action_pressed("interact") and not event.is_echo() and not battle_active:
 		if dialogue_active:
 			_advance_dialogue()
@@ -700,7 +1036,8 @@ func _start_battle(encounter: String) -> void:
 	battle_instance.call("start_battle",
 		enemy["name"], enemy["hp"], enemy["damage"], enemy["xp"], enemy["color"],
 		enemy["weakness"], enemy["intents"],
-		player_hp, player_mp, player_level, potions
+		player_hp, player_mp, player_level, potions,
+		hero_name, hero_class, hero_vitality, hero_strength, hero_spirit, hero_agility
 	)
 
 func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, experience: int) -> void:
@@ -731,6 +1068,7 @@ func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, e
 func _update_hud() -> void:
 	if objective_label == null:
 		return
+	hero_identity_label.text = "%s  ·  %s" % [hero_name, hero_class]
 	match quest_step:
 		0:
 			objective_label.text = "Objective: Speak with Mira near the village gate."
@@ -749,7 +1087,7 @@ func _update_hud() -> void:
 	progression_label.text = "LV %d  ·  %d / %d XP" % [player_level, player_experience, experience_to_next_level()]
 	experience_bar.value = float(player_experience) / float(experience_to_next_level()) * 100.0
 	gold_label.text = "%d G" % gold
-	new_game_button.visible = quest_step >= 5
+	new_game_button.show()
 
 func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -764,6 +1102,14 @@ func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 		"player_level": player_level,
 		"player_experience": player_experience,
 		"potions": potions,
+		"hero_name": hero_name,
+		"hero_class": hero_class,
+		"hero_vitality": hero_vitality,
+		"hero_strength": hero_strength,
+		"hero_spirit": hero_spirit,
+		"hero_agility": hero_agility,
+		"position_x": player.global_position.x,
+		"position_y": player.global_position.y,
 		"salve_collected": salve_collected,
 		"cache_opened": cache_opened,
 		"waystone_discovered": waystone_discovered
@@ -808,6 +1154,28 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	):
 		push_error("Greenvale save is missing valid exploration values.")
 		return false
+	if int(save_version) >= 5 and (
+		not parsed.get("hero_name") is String \
+		or str(parsed["hero_name"]).strip_edges().is_empty() \
+		or str(parsed["hero_name"]).length() > 16 \
+		or not ["Warrior", "Mage", "Rogue"].has(parsed.get("hero_class")) \
+		or not _is_saved_integer(parsed.get("hero_vitality")) \
+		or not _is_saved_integer(parsed.get("hero_strength")) \
+		or not _is_saved_integer(parsed.get("hero_spirit")) \
+		or not _is_saved_integer(parsed.get("hero_agility")) \
+		or int(parsed.get("hero_vitality", 0)) < 1 or int(parsed.get("hero_vitality", 0)) > 30 \
+		or int(parsed.get("hero_strength", 0)) < 1 or int(parsed.get("hero_strength", 0)) > 30 \
+		or int(parsed.get("hero_spirit", 0)) < 1 or int(parsed.get("hero_spirit", 0)) > 30 \
+		or int(parsed.get("hero_agility", 0)) < 1 or int(parsed.get("hero_agility", 0)) > 30
+	):
+		push_error("Greenvale save is missing valid hero values.")
+		return false
+	if int(save_version) >= 6 and (
+		not _is_saved_number(parsed.get("position_x")) \
+		or not _is_saved_number(parsed.get("position_y"))
+	):
+		push_error("Greenvale save is missing a valid hero position.")
+		return false
 
 	quest_step = clampi(int(parsed["quest_step"]), 0, 5)
 	if int(save_version) < 3 and quest_step == 2:
@@ -815,22 +1183,34 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	gold = maxi(int(parsed["gold"]), 0)
 	player_level = clampi(int(parsed.get("player_level", 1)), 1, 99)
 	player_experience = maxi(int(parsed.get("player_experience", 0)), 0)
+	hero_name = str(parsed.get("hero_name", DEFAULT_HERO_NAME)).strip_edges()
+	hero_class = str(parsed.get("hero_class", DEFAULT_HERO_CLASS))
+	hero_vitality = clampi(int(parsed.get("hero_vitality", 13)), 1, 30)
+	hero_strength = clampi(int(parsed.get("hero_strength", 10)), 1, 30)
+	hero_spirit = clampi(int(parsed.get("hero_spirit", 12)), 1, 30)
+	hero_agility = clampi(int(parsed.get("hero_agility", 10)), 1, 30)
 	player_hp = clampi(int(parsed["player_hp"]), 1, max_hp())
 	player_mp = clampi(int(parsed.get("player_mp", STARTING_MP)), 0, max_mp())
 	potions = clampi(int(parsed["potions"]), 0, 99)
 	salve_collected = bool(parsed.get("salve_collected", false))
 	cache_opened = bool(parsed.get("cache_opened", false))
 	waystone_discovered = bool(parsed.get("waystone_discovered", false))
+	if int(save_version) >= 6:
+		player.global_position = Vector2(
+			clampf(float(parsed["position_x"]), 24.0, WORLD_SIZE.x - 24.0),
+			clampf(float(parsed["position_y"]), 24.0, WORLD_SIZE.y - 24.0)
+		)
+	_update_hero_stats_label()
 	return true
 
 func experience_to_next_level() -> int:
 	return 60 + (player_level - 1) * 35
 
 func max_hp() -> int:
-	return PLAYER_MAX_HP + (player_level - 1) * 20
+	return 48 + hero_vitality * 4 + (player_level - 1) * 20
 
 func max_mp() -> int:
-	return STARTING_MP + (player_level - 1) * 6
+	return 6 + hero_spirit * 2 + (player_level - 1) * 6
 
 func _award_experience(amount: int) -> bool:
 	player_experience += amount
@@ -851,15 +1231,26 @@ func _is_saved_integer(value: Variant) -> bool:
 		return false
 	return is_finite(float(value)) and floorf(float(value)) == float(value)
 
+func _is_saved_number(value: Variant) -> bool:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return false
+	return is_finite(float(value))
+
 func _confirm_new_game() -> void:
+	if creation_layer.visible or save_load_layer.visible or battle_active or dialogue_active:
+		return
 	new_game_dialog.popup_centered()
 
 func _start_fresh_game() -> void:
 	quest_step = 0
 	player_level = 1
 	player_experience = 0
-	player_hp = max_hp()
-	player_mp = max_mp()
+	hero_name = DEFAULT_HERO_NAME
+	hero_class = DEFAULT_HERO_CLASS
+	hero_vitality = 13
+	hero_strength = 10
+	hero_spirit = 12
+	hero_agility = 10
 	potions = 0
 	gold = 0
 	salve_collected = false
@@ -874,7 +1265,5 @@ func _start_fresh_game() -> void:
 		battle_instance = null
 	_sync_exploration_markers()
 	player.position = Vector2(250, 448)
-	var save_error := save_progress(progress_save_path)
-	if save_error != OK:
-		push_error("Could not save new-game progress: %s" % error_string(save_error))
+	_begin_hero_creation()
 	_update_hud()

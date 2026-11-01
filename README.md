@@ -22,7 +22,9 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - **E**: Talk to Mira / continue dialogue
 - **1-5** (or click): Attack, Ember magic, Guard, Potion, Flee
 - Ember costs 8 MP; shade victories award XP, and leveling up increases HP and MP
-- Quest, combat, and character progress save as you play; use **New Game** on the HUD to reset a completed run
+- **Save / Load**: Open the three-slot save menu; overwriting a used slot requires confirmation
+- Quest, combat, hero, and world position progress auto-save as you play; loaded slots become the active auto-save
+- Use **New Game** on the HUD at any time to start over; confirmation protects the active run, and other save slots remain unchanged
 
 ## Project Structure
 
@@ -64,7 +66,7 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - Turn order calculated by `(ATK / DEF) * 100`
 - Elemental system: Fire, Ice, Lightning, Wind, Earth, Water
 - Status effects: Burn, Freeze, Shock, Poison, Sleep
-- Greenvale progress stored in `user://greenvale_progress.json`
+- Greenvale progress auto-saves to `user://greenvale_progress.json`; manual slots are stored alongside it as `user://greenvale_progress_slot_1.json` through `_slot_3.json`
 
 ## Default Party
 

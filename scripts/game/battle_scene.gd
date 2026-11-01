@@ -2,9 +2,6 @@ extends Node
 
 signal finished(outcome: String, hp: int, mp: int, potion_count: int, experience: int)
 
-const PLAYER_MAX_HP := 100
-const STARTING_MP := 30
-
 var enemy_name: String = "Shade"
 var enemy_max_hp: int = 112
 var enemy_hp: int = 112
@@ -14,10 +11,16 @@ var enemy_color := Color("647b9a")
 var weakness: String = "fire"
 var intent_pattern: PackedStringArray = PackedStringArray(["Heavy strike", "Shadow swipe", "Shadow swipe"])
 var intent_index: int = 0
-var player_hp: int = PLAYER_MAX_HP
-var player_mp: int = STARTING_MP
+var player_hp: int = 100
+var player_mp: int = 30
 var player_level: int = 1
 var potions: int = 0
+var hero_name: String = "Adventurer"
+var hero_class: String = "Warrior"
+var hero_vitality: int = 13
+var hero_strength: int = 10
+var hero_spirit: int = 12
+var hero_agility: int = 10
 var guarding: bool = false
 var active: bool = false
 var battle_outcome: String = ""
@@ -49,7 +52,13 @@ func start_battle(
 		current_hp: int,
 		current_mp: int,
 		level: int,
-		potion_count: int
+		potion_count: int,
+		combatant_name: String,
+		combatant_class: String,
+		vitality: int,
+		strength: int,
+		spirit: int,
+		agility: int
 ) -> void:
 	enemy_name = foe_name
 	enemy_max_hp = foe_hp
@@ -64,6 +73,12 @@ func start_battle(
 	player_mp = current_mp
 	player_level = level
 	potions = potion_count
+	hero_name = combatant_name
+	hero_class = combatant_class
+	hero_vitality = vitality
+	hero_strength = strength
+	hero_spirit = spirit
+	hero_agility = agility
 	active = true
 	battle_outcome = ""
 	enemy_art.texture = _make_enemy_texture(enemy_color)
@@ -220,7 +235,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _attack() -> void:
 	if not active:
 		return
-	var damage := randi_range(18, 25) + (player_level - 1) * 3
+	var damage := randi_range(18, 25) + (hero_strength - 10) * 2 + (player_level - 1) * 3
+	if hero_class == "Warrior":
+		damage += 4
+	damage = maxi(damage, 1)
 	var weakness_message := ""
 	if weakness == "physical":
 		damage = ceili(damage * 1.5)
@@ -233,7 +251,9 @@ func _cast_magic() -> void:
 	if not active or player_mp < 8:
 		return
 	player_mp -= 8
-	var damage := 34 + (player_level - 1) * 4
+	var damage := 18 + hero_spirit * 2 + (player_level - 1) * 4
+	if hero_class == "Mage":
+		damage += 8
 	var weakness_message := ""
 	if weakness == "fire":
 		damage = ceili(damage * 1.5)
@@ -250,7 +270,7 @@ func _guard() -> void:
 	_after_player_action()
 
 func _use_potion() -> void:
-	var maximum_hp := PLAYER_MAX_HP + (player_level - 1) * 20
+	var maximum_hp := 48 + hero_vitality * 4 + (player_level - 1) * 20
 	if not active or potions <= 0 or player_hp >= maximum_hp:
 		return
 	var restored := mini(35, maximum_hp - player_hp)
@@ -282,10 +302,14 @@ func _after_player_action() -> void:
 	if intent.begins_with("Heavy"):
 		damage = ceili(damage * 1.65)
 	if guarding:
-		damage = ceili(damage * 0.4)
+		damage = ceili(damage * (0.25 if hero_class == "Warrior" else 0.4))
 		guarding = false
-	player_hp = maxi(player_hp - damage, 0)
-	battle_log.text += "\n%s uses %s for %d damage." % [enemy_name, intent.to_lower(), damage]
+	var evaded := randi_range(1, 100) <= _dodge_chance()
+	if evaded:
+		battle_log.text += "\n%s uses %s, but you evade it!" % [enemy_name, intent.to_lower()]
+	else:
+		player_hp = maxi(player_hp - damage, 0)
+		battle_log.text += "\n%s uses %s for %d damage." % [enemy_name, intent.to_lower(), damage]
 	if not intent_pattern.is_empty():
 		intent_index = (intent_index + 1) % intent_pattern.size()
 	_update_ui()
@@ -312,15 +336,17 @@ func _update_ui() -> void:
 	if enemy_hp_bar == null:
 		return
 	enemy_hp_bar.value = float(enemy_hp) / float(enemy_max_hp) * 100.0
-	player_status.text = "YOU  ·  LV %d  ·  HP %d/%d  ·  MP %d/%d" % [
+	player_status.text = "%s  ·  %s LV %d  ·  HP %d/%d  ·  MP %d/%d" % [
+		hero_name,
+		hero_class,
 		player_level,
 		player_hp,
-		PLAYER_MAX_HP + (player_level - 1) * 20,
+		48 + hero_vitality * 4 + (player_level - 1) * 20,
 		player_mp,
-		STARTING_MP + (player_level - 1) * 6
+		6 + hero_spirit * 2 + (player_level - 1) * 6
 	]
 	potion_button.text = "Potion (%d)" % potions
-	potion_button.disabled = potions <= 0 or player_hp >= PLAYER_MAX_HP + (player_level - 1) * 20
+	potion_button.disabled = potions <= 0 or player_hp >= 48 + hero_vitality * 4 + (player_level - 1) * 20
 	magic_button.disabled = player_mp < 8
 	magic_button.text = "Magic (8 MP)" if player_mp >= 8 else "Magic (need MP)"
 	if enemy_title != null:
@@ -334,6 +360,9 @@ func _current_intent() -> String:
 	if intent_pattern.is_empty():
 		return "Strike"
 	return intent_pattern[intent_index]
+
+func _dodge_chance() -> int:
+	return mini(hero_agility * 2, 40) if hero_class == "Rogue" else 0
 
 func _make_enemy_texture(color: Color) -> Texture2D:
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
