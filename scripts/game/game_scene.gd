@@ -8,6 +8,12 @@ const VILLAGE_EDGE := 640.0
 const FOREST_GATE := 720.0
 const CLEARING_POSITION := Vector2(1330.0, 448.0)
 const WOLF_CLEARING_POSITION := Vector2(1360.0, 704.0)
+const NORTHERN_TRACKS_POSITION := Vector2(1040.0, 480.0)
+const SOUTHERN_TRACKS_POSITION := Vector2(1270.0, 620.0)
+const SCORCH_MARKS_POSITION := Vector2(1270.0, 600.0)
+const STONE_TRACKS_POSITION := Vector2(1270.0, 780.0)
+const ASHWING_POSITION := Vector2(1440.0, 600.0)
+const THORNBACK_POSITION := Vector2(1450.0, 780.0)
 const SALVE_POSITION := Vector2(880.0, 448.0)
 const CACHE_POSITION := Vector2(1210.0, 390.0)
 const WAYSTONE_POSITION := Vector2(1150.0, 570.0)
@@ -18,7 +24,7 @@ const CAVE_GUARDIAN_POSITION := Vector2(920.0, 800.0)
 const CAVE_TREASURE_POSITION := Vector2(840.0, 800.0)
 const PLAYER_MAX_HP := 100
 const PROGRESS_SAVE_PATH := "user://greenvale_progress.json"
-const SAVE_VERSION := 9
+const SAVE_VERSION := 10
 const SAVE_SLOT_COUNT := 3
 const STARTING_MP := 30
 const DEFAULT_HERO_NAME := "Adventurer"
@@ -62,6 +68,9 @@ var world_tiles: TileMapLayer
 var tree_positions: Array[Vector2] = []
 var tree_texture: Texture2D
 var quest_step: int = 0
+var northern_tracks_found: bool = false
+var southern_tracks_found: bool = false
+var hunter_contract_stage: int = 0
 var dialogue_lines: Array[String] = []
 var dialogue_index: int = 0
 var dialogue_active: bool = false
@@ -101,7 +110,6 @@ var save_slot_prefix: String = ""
 var hud_layer: CanvasLayer
 var objective_label: Label
 var hero_identity_label: Label
-var equipment_label: Label
 var hp_bar: ProgressBar
 var mp_bar: ProgressBar
 var experience_bar: ProgressBar
@@ -185,6 +193,10 @@ func _build_world() -> void:
 	_add_world_marker(WAYSTONE_POSITION, "waystone")
 	_add_world_marker(CAMPFIRE_POSITION, "campfire")
 	_add_world_marker(CAVE_ENTRANCE_POSITION, "cave")
+	_add_world_marker(NORTHERN_TRACKS_POSITION, "northern_tracks")
+	_add_world_marker(SOUTHERN_TRACKS_POSITION, "southern_tracks")
+	_add_world_marker(SCORCH_MARKS_POSITION, "scorch")
+	_add_world_marker(STONE_TRACKS_POSITION, "stone_tracks")
 	_add_cave_walls()
 
 func _add_cave_walls() -> void:
@@ -377,6 +389,19 @@ func _make_marker_texture(marker: String) -> Texture2D:
 			_pixel(image, 10, 8, 4, 9, Color("c6b67a"))
 			_pixel(image, 11, 10, 2, 5, Color("e8dba4"))
 			_pixel(image, 4, 20, 16, 3, Color("535f56"))
+		"northern_tracks", "southern_tracks":
+			_pixel(image, 3, 10, 7, 5, Color("564335"))
+			_pixel(image, 14, 8, 7, 5, Color("564335"))
+			_pixel(image, 7, 17, 7, 4, Color("b19a67"))
+			_pixel(image, 15, 16, 5, 4, Color("b19a67"))
+		"scorch":
+			_pixel(image, 4, 16, 16, 4, Color("533a2f"))
+			_pixel(image, 7, 11, 11, 4, Color("bd6340"))
+			_pixel(image, 10, 6, 5, 5, Color("f0b956"))
+		"stone_tracks":
+			_pixel(image, 4, 15, 16, 6, Color("767d77"))
+			_pixel(image, 7, 10, 10, 5, Color("b6b18f"))
+			_pixel(image, 11, 5, 3, 5, Color("e2d7a3"))
 		"campfire":
 			_pixel(image, 4, 16, 16, 4, Color("6d4931"))
 			_pixel(image, 6, 14, 12, 3, Color("9a6338"))
@@ -545,55 +570,54 @@ func _build_interface() -> void:
 	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(screen)
 
-	var hud := _make_panel(screen, Rect2(18, 18, 474, 230))
+	var hud := _make_panel(screen, Rect2(18, 18, 356, 166))
 	var hud_content := VBoxContainer.new()
-	hud_content.add_theme_constant_override("separation", 6)
+	hud_content.add_theme_constant_override("separation", 3)
 	hud.add_child(hud_content)
-	var title := _make_label("CHRONO CHRONICLES  /  GREENVALE", 18, Color("f4e3b8"))
-	hud_content.add_child(title)
-	hero_identity_label = _make_label("", 13, Color("f3d890"))
+	hero_identity_label = _make_label("", 14, Color("f4e3b8"))
 	hud_content.add_child(hero_identity_label)
-	objective_label = _make_label("", 15, Color("e8eddb"))
+	objective_label = _make_label("", 12, Color("e8eddb"))
 	objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective_label.custom_minimum_size.y = 30
 	hud_content.add_child(objective_label)
-	equipment_label = _make_label("", 12, Color("c7d4be"))
-	equipment_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hud_content.add_child(equipment_label)
 
 	var stats := HBoxContainer.new()
-	stats.add_theme_constant_override("separation", 10)
+	stats.add_theme_constant_override("separation", 6)
 	hud_content.add_child(stats)
-	var hp_text := _make_label("HP", 14, Color("f4e3b8"))
+	var hp_text := _make_label("HP", 11, Color("f4e3b8"))
 	stats.add_child(hp_text)
 	hp_bar = _make_bar(Color("70c17b"))
-	hp_bar.custom_minimum_size = Vector2(116, 18)
+	hp_bar.custom_minimum_size = Vector2(76, 14)
 	stats.add_child(hp_bar)
-	stats.add_child(_make_label("MP", 14, Color("b8d7e8")))
+	stats.add_child(_make_label("MP", 11, Color("b8d7e8")))
 	mp_bar = _make_bar(Color("6da7d1"))
-	mp_bar.custom_minimum_size = Vector2(84, 18)
+	mp_bar.custom_minimum_size = Vector2(60, 14)
 	stats.add_child(mp_bar)
-	gold_label = _make_label("0 G", 14, Color("f0cf75"))
-	stats.add_child(gold_label)
+	gold_label = _make_label("Gold: 0 G", 12, Color("f0cf75"))
+	var gold_row := HBoxContainer.new()
+	gold_row.add_theme_constant_override("separation", 4)
+	hud_content.add_child(gold_row)
+	gold_row.add_child(gold_label)
 	new_game_button = _make_button("New Game")
 	new_game_button.custom_minimum_size = Vector2(88, 34)
 	new_game_button.add_theme_font_size_override("font_size", 12)
 	new_game_button.pressed.connect(_confirm_new_game)
 
 	var progression := HBoxContainer.new()
-	progression.add_theme_constant_override("separation", 8)
+	progression.add_theme_constant_override("separation", 5)
 	hud_content.add_child(progression)
-	progression_label = _make_label("", 13, Color("f3d890"))
+	progression_label = _make_label("", 11, Color("f3d890"))
 	progression.add_child(progression_label)
 	experience_bar = _make_bar(Color("d4a84e"))
-	experience_bar.custom_minimum_size = Vector2(230, 14)
+	experience_bar.custom_minimum_size = Vector2(145, 10)
 	progression.add_child(experience_bar)
 
-	var controls := _make_panel(screen, Rect2(630, 18, 330, 150))
+	var controls := _make_panel(screen, Rect2(672, 18, 288, 112))
 	var controls_content := VBoxContainer.new()
-	controls_content.add_theme_constant_override("separation", 6)
+	controls_content.add_theme_constant_override("separation", 3)
 	controls.add_child(controls_content)
-	controls_content.add_child(_make_label("WASD / Arrows  Move", 13, Color("e8eddb")))
-	controls_content.add_child(_make_label("E  Talk  ·  1-5 Battle", 13, Color("e8eddb")))
+	controls_content.add_child(_make_label("Move: WASD / Arrows  ·  Interact: E", 11, Color("e8eddb")))
+	controls_content.add_child(_make_label("Battle: 1-5  ·  Bag: I", 11, Color("e8eddb")))
 	var save_controls := HBoxContainer.new()
 	save_controls.add_theme_constant_override("separation", 6)
 	controls_content.add_child(save_controls)
@@ -605,7 +629,7 @@ func _build_interface() -> void:
 	save_menu_button.custom_minimum_size = Vector2(94, 34)
 	save_menu_button.pressed.connect(_open_save_load_ui)
 	save_controls.add_child(save_menu_button)
-	new_game_button.custom_minimum_size = Vector2(94, 34)
+	new_game_button.custom_minimum_size = Vector2(84, 32)
 	save_controls.add_child(new_game_button)
 
 	prompt_panel = _make_panel(screen, Rect2(310, 540, 340, 48))
@@ -1373,10 +1397,18 @@ func _process(_delta: float) -> void:
 	if player == null:
 		return
 	_update_prompt()
-	if quest_step == 1 and not encounter_started and player.global_position.distance_to(CLEARING_POSITION) < 76.0:
+	if quest_step == 1 and northern_tracks_found and not encounter_started \
+		and player.global_position.distance_to(CLEARING_POSITION) < 76.0:
 		_start_battle("shade")
-	elif quest_step == 3 and not encounter_started and player.global_position.distance_to(WOLF_CLEARING_POSITION) < 76.0:
+	elif quest_step == 3 and southern_tracks_found and not encounter_started \
+		and player.global_position.distance_to(WOLF_CLEARING_POSITION) < 76.0:
 		_start_battle("wolf")
+	elif hunter_contract_stage == 2 and not encounter_started \
+		and player.global_position.distance_to(ASHWING_POSITION) < 80.0:
+		_start_battle("hunt_ashwing")
+	elif hunter_contract_stage == 4 and not encounter_started \
+		and player.global_position.distance_to(THORNBACK_POSITION) < 80.0:
+		_start_battle("hunt_thornback")
 	elif in_cave and not cave_guardian_defeated and not encounter_started \
 		and player.global_position.distance_to(CAVE_GUARDIAN_POSITION) < 64.0:
 		_start_battle("guardian")
@@ -1418,6 +1450,18 @@ func _update_prompt() -> void:
 	elif _near_world_object(WAYSTONE_POSITION) and not waystone_discovered:
 		prompt_label.text = "E  Read the ancient waystone"
 		prompt_panel.show()
+	elif quest_step == 1 and not northern_tracks_found and _near_world_object(NORTHERN_TRACKS_POSITION):
+		prompt_label.text = "E  Examine the broken branches"
+		prompt_panel.show()
+	elif quest_step == 3 and not southern_tracks_found and _near_world_object(SOUTHERN_TRACKS_POSITION):
+		prompt_label.text = "E  Study the tracks in the mud"
+		prompt_panel.show()
+	elif hunter_contract_stage == 1 and _near_world_object(SCORCH_MARKS_POSITION):
+		prompt_label.text = "E  Examine the scorched earth"
+		prompt_panel.show()
+	elif hunter_contract_stage == 3 and _near_world_object(STONE_TRACKS_POSITION):
+		prompt_label.text = "E  Inspect the claw marks"
+		prompt_panel.show()
 	elif _near_world_object(CAMPFIRE_POSITION):
 		prompt_label.text = "E  Rest at the campfire"
 		prompt_panel.show()
@@ -1456,6 +1500,22 @@ func _interact_with_world() -> void:
 		in_cave = true
 		player.global_position = CAVE_EXIT_POSITION
 		_show_notice("You enter the old cave. Something stirs in the darkness.")
+	elif quest_step == 1 and not northern_tracks_found and _near_world_object(NORTHERN_TRACKS_POSITION):
+		northern_tracks_found = true
+		_sync_exploration_markers()
+		_show_notice("The broken branches point east. A heavy, ash-scented presence waits in the clearing.")
+	elif quest_step == 3 and not southern_tracks_found and _near_world_object(SOUTHERN_TRACKS_POSITION):
+		southern_tracks_found = true
+		_sync_exploration_markers()
+		_show_notice("The deep pawprints turn toward the southern glade. Whatever made them is close.")
+	elif hunter_contract_stage == 1 and _near_world_object(SCORCH_MARKS_POSITION):
+		hunter_contract_stage = 2
+		_sync_exploration_markers()
+		_show_notice("The scorch marks are fresh. A winged shape dives from the trees!")
+	elif hunter_contract_stage == 3 and _near_world_object(STONE_TRACKS_POSITION):
+		hunter_contract_stage = 4
+		_sync_exploration_markers()
+		_show_notice("The claw marks end at a pile of broken stone. Two creatures block the trail.")
 	elif _near_world_object(SALVE_POSITION) and not salve_collected:
 		salve_collected = true
 		potions += 1
@@ -1496,6 +1556,10 @@ func _sync_exploration_markers() -> void:
 	exploration_markers["salve"].visible = not salve_collected
 	exploration_markers["cache"].visible = not cache_opened
 	exploration_markers["waystone"].visible = not waystone_discovered
+	exploration_markers["northern_tracks"].visible = quest_step == 1 and not northern_tracks_found
+	exploration_markers["southern_tracks"].visible = quest_step == 3 and not southern_tracks_found
+	exploration_markers["scorch"].visible = hunter_contract_stage == 1
+	exploration_markers["stone_tracks"].visible = hunter_contract_stage == 3
 
 func _talk_to_mira() -> void:
 	var save_error: Error
@@ -1532,12 +1596,38 @@ func _talk_to_mira() -> void:
 		save_error = save_progress(progress_save_path)
 		if save_error != OK:
 			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
+	elif quest_step >= 5 and hunter_contract_stage == 0:
+		dialogue_lines = [
+			"Mira: The forest is quiet, but two new creatures have appeared near the old trail.",
+			"Examine the scorch marks east of the cave path, then follow the stone tracks. Take care: they may hunt together."
+		]
+		hunter_contract_stage = 1
+		save_error = save_progress(progress_save_path)
+		if save_error != OK:
+			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
+	elif quest_step >= 5 and hunter_contract_stage == 5:
+		dialogue_lines = ["Mira: You cleared the last trail! Take 200 gold and 140 XP. Greenvale owes you much."]
+		hunter_contract_stage = 6
+		gold += 200
+		_award_experience(140)
+		save_error = save_progress(progress_save_path)
+		if save_error != OK:
+			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
+	elif quest_step >= 5 and hunter_contract_stage == 1:
+		dialogue_lines = ["Mira: Find the scorch marks east of the cave path. Something is nesting nearby."]
+	elif quest_step >= 5 and hunter_contract_stage == 2:
+		dialogue_lines = ["Mira: The winged beast should be near the scorch marks."]
+	elif quest_step >= 5 and hunter_contract_stage == 3:
+		dialogue_lines = ["Mira: Follow the heavy claw marks along the lower trail."]
+	elif quest_step >= 5 and hunter_contract_stage == 4:
+		dialogue_lines = ["Mira: The stone trail ends near the lower forest path."]
 	else:
 		dialogue_lines = ["Mira: Greenvale is peaceful again. Thank you, friend."]
 	dialogue_index = 0
 	dialogue_active = true
 	dialogue_panel.show()
 	_show_dialogue_line()
+	_sync_exploration_markers()
 	_update_hud()
 
 func _advance_dialogue() -> void:
@@ -1558,23 +1648,46 @@ func _start_battle(encounter: String) -> void:
 	active_encounter = encounter
 	player.set("movement_enabled", false)
 	var enemy: Dictionary
+	var additional_enemy: Dictionary = {}
 	match encounter:
 		"wolf":
 			enemy = {
 				"name": "Bramble Wolf", "hp": 164, "damage": Vector2i(13, 19),
-				"xp": 130, "color": Color("a96f58"), "weakness": "physical",
+				"xp": 130, "gold": 22, "color": Color("a96f58"), "weakness": "physical",
 				"intents": PackedStringArray(["Quick bite", "Heavy pounce", "Quick bite"])
+			}
+		"hunt_ashwing":
+			enemy = {
+				"name": "Ashwing", "hp": 92, "damage": Vector2i(7, 11),
+				"xp": 80, "gold": 16, "color": Color("c97548"), "weakness": "physical",
+				"intents": PackedStringArray(["Cinder bolt", "Wing rush", "Cinder bolt"])
+			}
+			additional_enemy = {
+				"name": "Forest Shade", "hp": 76, "damage": Vector2i(6, 9),
+				"xp": 40, "gold": 8, "color": Color("647b9a"), "weakness": "fire",
+				"intents": PackedStringArray(["Shadow swipe", "Heavy strike"])
+			}
+		"hunt_thornback":
+			enemy = {
+				"name": "Thornback", "hp": 174, "damage": Vector2i(10, 15),
+				"xp": 100, "gold": 24, "color": Color("66834c"), "weakness": "fire",
+				"intents": PackedStringArray(["Shell guard", "Heavy charge", "Raking swipe"])
+			}
+			additional_enemy = {
+				"name": "Bramble Wolf", "hp": 108, "damage": Vector2i(9, 13),
+				"xp": 65, "gold": 14, "color": Color("a96f58"), "weakness": "physical",
+				"intents": PackedStringArray(["Quick bite", "Heavy pounce"])
 			}
 		"guardian":
 			enemy = {
 				"name": "Cave Sentinel", "hp": 148, "damage": Vector2i(12, 17),
-				"xp": 115, "color": Color("817f74"), "weakness": "fire",
+				"xp": 115, "gold": 30, "color": Color("817f74"), "weakness": "fire",
 				"intents": PackedStringArray(["Heavy slam", "Stone ward", "Shard throw"])
 			}
 		_:
 			enemy = {
 				"name": "Forest Shade", "hp": 112, "damage": Vector2i(10, 15),
-				"xp": 80, "color": Color("647b9a"), "weakness": "fire",
+				"xp": 80, "gold": 12, "color": Color("647b9a"), "weakness": "fire",
 				"intents": PackedStringArray(["Heavy strike", "Shadow swipe", "Shadow swipe"])
 			}
 	battle_instance = BATTLE_SCENE.instantiate()
@@ -1587,7 +1700,9 @@ func _start_battle(encounter: String) -> void:
 		hero_name, hero_class, hero_vitality, hero_strength, hero_spirit, hero_agility,
 		_equipment_stat("attack"),
 		_equipment_stat("magic"),
-		_equipment_stat("defense")
+		_equipment_stat("defense"),
+		additional_enemy,
+		int(enemy.get("gold", 0))
 	)
 
 func _equipment_stat(stat: String) -> int:
@@ -1598,7 +1713,9 @@ func _equipment_stat(stat: String) -> int:
 			total += int(ITEM_CATALOG[item_name].get(stat, 0))
 	return total
 
-func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, experience: int) -> void:
+func _on_battle_finished(
+		outcome: String, hp: int, mp: int, potion_count: int, experience: int, gold_reward: int
+) -> void:
 	player_hp = hp
 	player_mp = mp
 	potions = potion_count
@@ -1606,6 +1723,7 @@ func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, e
 	player.set("movement_enabled", true)
 	if outcome == "victory":
 		encounter_started = false
+		gold += gold_reward
 		match active_encounter:
 			"shade":
 				quest_step = 2
@@ -1613,6 +1731,10 @@ func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, e
 				quest_step = 4
 			"guardian":
 				cave_guardian_defeated = true
+			"hunt_ashwing":
+				hunter_contract_stage = 3
+			"hunt_thornback":
+				hunter_contract_stage = 5
 		_award_experience(experience)
 	elif outcome == "flee":
 		encounter_started = false
@@ -1631,6 +1753,7 @@ func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, e
 	var save_error := save_progress(progress_save_path)
 	if save_error != OK:
 		push_error("Could not save Greenvale progress: %s" % error_string(save_error))
+	_sync_exploration_markers()
 	_update_hud()
 	battle_instance.queue_free()
 	battle_instance = null
@@ -1640,36 +1763,41 @@ func _update_hud() -> void:
 		return
 	cave_seal.disabled = quest_step >= 5
 	hero_identity_label.text = "%s  ·  %s" % [hero_name, hero_class]
-	equipment_label.text = "Gear: %s" % "  ·  ".join(_equipment_summary())
-	match quest_step:
-		0:
-			objective_label.text = "Objective: Speak with Mira near the village gate."
+	match hunter_contract_stage:
 		1:
-			objective_label.text = "Objective: Follow the northern trail and defeat the forest shade."
+			objective_label.text = "Objective: Examine scorch marks east of the cave path."
 		2:
-			objective_label.text = "Objective: Return to Mira for your reward."
+			objective_label.text = "Objective: Defeat the creatures near the scorched earth."
 		3:
-			objective_label.text = "Objective: Investigate the southern trail and find the wolf."
+			objective_label.text = "Objective: Follow the stone tracks on the lower trail."
 		4:
-			objective_label.text = "Objective: Return to Mira and report the wolf encounter."
+			objective_label.text = "Objective: Defeat the creatures at the end of the tracks."
+		5:
+			objective_label.text = "Objective: Return to Mira with the trail cleared."
+		6:
+			objective_label.text = "Hunt complete: Both trails are safe. Explore Greenvale!"
 		_:
-			objective_label.text = "Adventure complete: The forest is safe. Explore Greenvale!"
+			match quest_step:
+				0:
+					objective_label.text = "Objective: Speak with Mira near the village gate."
+				1:
+					objective_label.text = "Objective: Examine the broken branches on the northern trail." \
+						if not northern_tracks_found else "Objective: Defeat the shade in the northern clearing."
+				2:
+					objective_label.text = "Objective: Return to Mira for your reward."
+				3:
+					objective_label.text = "Objective: Study the tracks near the southern trail." \
+						if not southern_tracks_found else "Objective: Defeat the creature in the southern glade."
+				4:
+					objective_label.text = "Objective: Return to Mira and report the wolf encounter."
+				_:
+					objective_label.text = "Adventure complete: The forest is safe. Explore Greenvale!"
 	hp_bar.value = float(player_hp) / float(max_hp()) * 100.0
 	mp_bar.value = float(player_mp) / float(max_mp()) * 100.0
 	progression_label.text = "LV %d  ·  %d / %d XP" % [player_level, player_experience, experience_to_next_level()]
 	experience_bar.value = float(player_experience) / float(experience_to_next_level()) * 100.0
-	gold_label.text = "%d G" % gold
+	gold_label.text = "Gold: %d G" % gold
 	new_game_button.show()
-
-func _equipment_summary() -> PackedStringArray:
-	var summary := PackedStringArray()
-	for slot in EQUIPMENT_SLOTS:
-		var item_name: String = equipped_slots[slot]
-		summary.append("%s: %s" % [
-			EQUIPMENT_SLOT_LABELS[slot],
-			item_name if not item_name.is_empty() else "Empty"
-		])
-	return summary
 
 func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -1697,6 +1825,9 @@ func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 		"salve_collected": salve_collected,
 		"cache_opened": cache_opened,
 		"waystone_discovered": waystone_discovered,
+		"northern_tracks_found": northern_tracks_found,
+		"southern_tracks_found": southern_tracks_found,
+		"hunter_contract_stage": hunter_contract_stage,
 		"in_cave": in_cave,
 		"cave_guardian_defeated": cave_guardian_defeated,
 		"cave_treasure_claimed": cave_treasure_claimed
@@ -1773,6 +1904,15 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	if int(save_version) >= 8 and not _is_valid_saved_equipment(parsed, int(save_version)):
 		push_error("Greenvale save is missing valid equipment values.")
 		return false
+	if int(save_version) >= 10 and (
+		typeof(parsed.get("northern_tracks_found")) != TYPE_BOOL \
+		or typeof(parsed.get("southern_tracks_found")) != TYPE_BOOL \
+		or not _is_saved_integer(parsed.get("hunter_contract_stage")) \
+		or int(parsed.get("hunter_contract_stage", -1)) < 0 \
+		or int(parsed.get("hunter_contract_stage", -1)) > 6
+	):
+		push_error("Greenvale save is missing valid quest evidence.")
+		return false
 
 	quest_step = clampi(int(parsed["quest_step"]), 0, 5)
 	if int(save_version) < 3 and quest_step == 2:
@@ -1809,6 +1949,9 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	salve_collected = bool(parsed.get("salve_collected", false))
 	cache_opened = bool(parsed.get("cache_opened", false))
 	waystone_discovered = bool(parsed.get("waystone_discovered", false))
+	northern_tracks_found = bool(parsed.get("northern_tracks_found", quest_step >= 2))
+	southern_tracks_found = bool(parsed.get("southern_tracks_found", quest_step >= 4))
+	hunter_contract_stage = clampi(int(parsed.get("hunter_contract_stage", 0)), 0, 6)
 	in_cave = bool(parsed.get("in_cave", false))
 	cave_guardian_defeated = bool(parsed.get("cave_guardian_defeated", false))
 	cave_treasure_claimed = bool(parsed.get("cave_treasure_claimed", false))
@@ -1913,6 +2056,9 @@ func _confirm_new_game() -> void:
 
 func _start_fresh_game() -> void:
 	quest_step = 0
+	northern_tracks_found = false
+	southern_tracks_found = false
+	hunter_contract_stage = 0
 	player_level = 1
 	player_experience = 0
 	hero_name = DEFAULT_HERO_NAME

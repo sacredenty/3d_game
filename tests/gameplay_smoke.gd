@@ -40,6 +40,17 @@ func _run() -> void:
 	var rolled_spirit: int = game.get("hero_spirit")
 	var rolled_agility: int = game.get("hero_agility")
 	_check(game.get("new_game_button").visible, "New Game should be available before quest completion")
+	var hud_panel: Control = game.get("objective_label").get_parent().get_parent()
+	var hud_bounds := Rect2(hud_panel.position, hud_panel.size)
+	var controls_button := _find_button(game, "Save / Load")
+	var controls_panel: Control = controls_button.get_parent().get_parent().get_parent()
+	var controls_bounds := Rect2(controls_panel.position, controls_panel.size)
+	_check(hud_panel.size.x <= 380 and hud_panel.size.y <= 170, "The always-visible HUD should remain compact")
+	_check(not hud_bounds.intersects(controls_bounds), "HUD and controls panels should not overlap")
+	_check(controls_bounds.end.x <= 960 and controls_bounds.end.y <= 600, "HUD controls should fit inside the viewport")
+	_check(not game.get("objective_label").get_parent().get_children().any(
+		func(child: Node) -> bool: return child is Label and child.text.begins_with("Gear:")
+	), "The compact HUD should leave detailed equipment to the Bag menu")
 	game.call("_confirm_new_game")
 	_check(game.get("new_game_dialog").visible, "Starting over should ask for confirmation")
 	game.get("new_game_dialog").canceled.emit()
@@ -63,6 +74,7 @@ func _run() -> void:
 	_interact_at(game, player, Vector2(1210, 390))
 	_check(game.get("cache_opened"), "The optional supply cache should be opened")
 	_check(game.get("gold") == 40, "The supply cache should award 40 gold")
+	_check(game.get("gold_label").text == "Gold: 40 G", "The HUD should display gold gained from the supply cache")
 	_interact_at(game, player, Vector2(1150, 570))
 	_check(game.get("waystone_discovered"), "The ancient waystone should count as a discovery")
 	_check(game.get("player_experience") == 25, "The waystone should award its discovery XP")
@@ -78,7 +90,14 @@ func _run() -> void:
 	_check(not game.get("exploration_markers").get("cache").visible, "Opened cache should disappear from the world")
 	_check(not game.get("exploration_markers").get("waystone").visible, "Discovered waystone should disappear from the world")
 
-	game.call("_start_battle", "shade")
+	player.global_position = Vector2(1330, 448)
+	game.call("_process", 0.0)
+	_check(not game.get("battle_active"), "The shade should not ambush the hero before the tracks are investigated")
+	_interact_at(game, player, Vector2(1040, 480))
+	_check(game.get("northern_tracks_found"), "Examining the northern tracks should reveal the shade's location")
+	player.global_position = Vector2(1330, 448)
+	game.call("_process", 0.0)
+	_check(game.get("battle_active"), "Investigating the tracks should enable the shade encounter")
 	var flee_battle: Node = game.get("battle_instance")
 	flee_battle.call("_flee")
 	flee_battle.get("result_button").emit_signal("pressed")
@@ -127,6 +146,9 @@ func _run() -> void:
 	_check(not game.get("battle_active"), "Closing battle results should resume world movement")
 	_check(game.get("quest_step") == 2, "Defeating the shade should lead back to Mira")
 	_check(game.get("player_experience") == 45, "Shade and discovery XP should carry over after leveling")
+	_check(game.get("gold") == 52, "Defeating the Forest Shade should grant its gold drop")
+	_check(shade_battle.get("battle_log").text.contains("found 12 G"), "Shade victory results should show its gold drop")
+	_check(game.get("gold_label").text == "Gold: 52 G", "The HUD should include monster gold after battle")
 	_check(game.get("player_level") == 2, "Shade XP should level the player")
 	_check(game.get("player_hp") == hp_after_battle, "Leveling up should preserve battle HP rather than fully heal")
 	_check(game.get("player_mp") == mp_after_battle, "Leveling up should preserve battle MP rather than fully restore it")
@@ -138,10 +160,16 @@ func _run() -> void:
 	player.global_position = game.get("npc").global_position
 	game.call("_talk_to_mira")
 	_check(game.get("quest_step") == 3, "Returning to Mira should unlock the southern trail")
-	_check(game.get("gold") == 115, "The first quest should grant its reward exactly once")
+	_check(game.get("gold") == 127, "The first quest should grant its reward exactly once")
+	_check(game.get("gold_label").text == "Gold: 127 G", "The HUD should refresh after Mira awards quest gold")
 	_check(game.get("potions") == 2, "Mira should provide a potion without removing trail supplies")
 	game.call("_advance_dialogue")
 	game.call("_advance_dialogue")
+	player.global_position = Vector2(1360, 704)
+	game.call("_process", 0.0)
+	_check(not game.get("battle_active"), "The wolf should not ambush the hero before its tracks are studied")
+	_interact_at(game, player, Vector2(1270, 620))
+	_check(game.get("southern_tracks_found"), "Studying the southern tracks should expose the wolf trail")
 	player.global_position = Vector2(1360, 704)
 	game.call("_process", 0.0)
 	_check(game.get("battle_active"), "Reaching the southern clearing should start the second fight")
@@ -159,12 +187,62 @@ func _run() -> void:
 	wolf_battle.result_button.emit_signal("pressed")
 	_check(game.get("quest_step") == 4, "Defeating the wolf should lead back to Mira")
 	_check(game.get("player_experience") == 80, "The second fight should award its distinct XP reward")
+	_check(game.get("gold") == 149, "Defeating the Bramble Wolf should grant its gold drop")
+	_check(wolf_battle.get("battle_log").text.contains("found 22 G"), "Wolf victory results should show its gold drop")
 	player.global_position = game.get("npc").global_position
 	game.call("_talk_to_mira")
 	_check(game.get("quest_step") == 5, "Reporting to Mira should complete the adventure")
-	_check(game.get("gold") == 240, "The two quests and optional cache should grant their rewards")
+	_check(game.get("gold") == 274, "Quest and cache rewards should add to monster gold drops")
 	_check(game.get("new_game_button").visible, "Completed adventure should offer a new game")
 	_check(game.get("cave_seal").disabled, "Completing the adventure should open the cave passage")
+
+	player.global_position = game.get("npc").global_position
+	game.call("_talk_to_mira")
+	_check(game.get("hunter_contract_stage") == 1, "Mira should offer an optional post-adventure hunt")
+	_interact_at(game, player, Vector2(1270, 600))
+	_check(game.get("hunter_contract_stage") == 2, "Investigating scorch marks should reveal the Ashwing encounter")
+	player.global_position = Vector2(1440, 600)
+	game.call("_process", 0.0)
+	var ashwing_battle: Node = game.get("battle_instance")
+	_check(game.get("battle_active"), "The Ashwing should appear at the end of the scorched trail")
+	_check(ashwing_battle.get("enemy_name") == "Ashwing", "The hunt should introduce the Ashwing")
+	_check(ashwing_battle.get("additional_enemy").get("name") == "Forest Shade", "The Ashwing hunt should be a mixed encounter")
+	_check(ashwing_battle.get("enemy_target_buttons").visible, "Mixed battles should expose target selection")
+	_check(ashwing_battle.get("intent_label").text == "Intent: Cinder bolt", "The Ashwing should telegraph its MP-draining spell")
+	ashwing_battle.set("armor_defense", 100)
+	var mp_before_cinder_bolt: int = ashwing_battle.get("player_mp")
+	ashwing_battle.call("_attack")
+	_check(ashwing_battle.get("player_mp") == mp_before_cinder_bolt - mini(mp_before_cinder_bolt, 4), "Cinder bolt should drain available MP")
+	ashwing_battle.call("_select_enemy", 1)
+	var shade_hp_before_targeted_attack: int = ashwing_battle.get("additional_enemy").get("hp")
+	ashwing_battle.call("_attack")
+	_check(ashwing_battle.get("additional_enemy").get("hp") < shade_hp_before_targeted_attack, "Mixed combat should let the player target the secondary enemy")
+	ashwing_battle.call("_finish", "victory")
+	_check(ashwing_battle.get("battle_log").text.contains("found 24 G"), "Mixed victory results should show both monster gold drops")
+	ashwing_battle.get("result_button").emit_signal("pressed")
+	_check(game.get("hunter_contract_stage") == 3, "Defeating the first mixed group should advance the hunt")
+	_check(game.get("gold") == 298, "Mixed victories should grant gold from both defeated monsters")
+	_interact_at(game, player, Vector2(1270, 780))
+	_check(game.get("hunter_contract_stage") == 4, "Inspecting the stone tracks should reveal the Thornback encounter")
+	player.global_position = Vector2(1450, 780)
+	game.call("_process", 0.0)
+	var thornback_battle: Node = game.get("battle_instance")
+	_check(thornback_battle.get("enemy_name") == "Thornback", "The second hunt should introduce the Thornback")
+	_check(thornback_battle.get("additional_enemy").get("name") == "Bramble Wolf", "The Thornback hunt should be a second mixed encounter")
+	thornback_battle.set("armor_defense", 100)
+	thornback_battle.call("_attack")
+	_check(thornback_battle.get("enemy_warding"), "The Thornback should raise its Shell guard")
+	thornback_battle.call("_attack")
+	_check(not thornback_battle.get("enemy_warding"), "The Thornback ward should absorb one attack")
+	_check(thornback_battle.get("battle_log").text.contains("ward absorbs"), "Shell guard should explain its damage reduction")
+	thornback_battle.call("_finish", "victory")
+	thornback_battle.get("result_button").emit_signal("pressed")
+	_check(game.get("hunter_contract_stage") == 5, "Defeating the second mixed group should complete the hunt")
+	_check(game.get("gold") == 336, "The second mixed victory should grant both monster gold drops")
+	player.global_position = game.get("npc").global_position
+	game.call("_talk_to_mira")
+	_check(game.get("hunter_contract_stage") == 6, "Reporting to Mira should finish the optional hunt")
+	_check(game.get("gold") == 536, "The hunt reward should add to all monster gold drops")
 
 	_interact_at(game, player, Vector2(1120, 800))
 	_check(game.get("in_cave"), "The completed adventure should unlock the optional cave")
@@ -200,8 +278,10 @@ func _run() -> void:
 	_check(not guardian_battle.get("enemy_warding"), "The sentinel's ward should absorb one player hit")
 	_check(guardian_battle.get("battle_log").text.contains("ward absorbs"), "The battle log should explain the ward's damage reduction")
 	guardian_battle.call("_finish", "victory")
+	_check(guardian_battle.get("battle_log").text.contains("found 30 G"), "Sentinel victory results should show its gold drop")
 	guardian_battle.get("result_button").emit_signal("pressed")
 	_check(game.get("cave_guardian_defeated"), "Winning should persist the guardian's defeat")
+	_check(game.get("gold") == 566, "Defeating the Cave Sentinel should grant its gold drop")
 	var spirit_before_treasure: int = game.get("hero_spirit")
 	var max_mp_before_treasure: int = game.call("max_mp")
 	game.set("player_mp", max_mp_before_treasure - 10)
@@ -228,11 +308,11 @@ func _run() -> void:
 	root.add_child(resumed_game)
 	await process_frame
 	_check(resumed_game.get("quest_step") == 5, "Adventure completion should persist after restarting")
-	_check(resumed_game.get("gold") == 240, "All gold rewards should persist after restarting")
+	_check(resumed_game.get("gold") == 566, "Quest, shop, and monster gold should persist after restarting")
 	_check(resumed_game.get("player_hp") == saved_hp, "HP should persist after restarting")
 	_check(resumed_game.get("player_mp") == saved_mp, "MP should persist after restarting")
-	_check(resumed_game.get("player_level") == 4, "Cave victory should award enough XP to reach level four")
-	_check(resumed_game.get("player_experience") == 65, "Cave victory XP should persist after restarting")
+	_check(resumed_game.get("player_level") == 6, "The cave and hunt rewards should persist through level six")
+	_check(resumed_game.get("player_experience") == 125, "The cave and hunt XP should persist after restarting")
 	_check(resumed_game.get("potions") == 2, "Potion count should persist after restarting")
 	_check(resumed_game.get("hero_name") == "Ari", "Hero name should persist after restarting")
 	_check(resumed_game.get("hero_class") == "Warrior", "Hero class should persist after restarting")
@@ -242,6 +322,9 @@ func _run() -> void:
 	_check(resumed_game.get("hero_agility") == rolled_agility, "Hero agility should persist after restarting")
 	_check(resumed_game.get("cave_guardian_defeated"), "Cave guardian defeat should persist after restarting")
 	_check(resumed_game.get("cave_treasure_claimed"), "Cave treasure claim should persist after restarting")
+	_check(resumed_game.get("hunter_contract_stage") == 6, "Optional hunt completion should persist after restarting")
+	_check(resumed_game.get("northern_tracks_found"), "Quest evidence should persist after restarting")
+	_check(resumed_game.get("southern_tracks_found"), "Quest evidence should persist after restarting")
 	_check(not resumed_game.get("in_cave"), "The saved hero should return outside the cave")
 	_check(resumed_game.get("salve_collected"), "Collected potion should persist after restarting")
 	_check(resumed_game.get("cache_opened"), "Opened cache should persist after restarting")
@@ -265,7 +348,7 @@ func _run() -> void:
 	resumed_game.queue_free()
 	await process_frame
 
-	for old_version in [1, 2, 3, 4, 5, 6, 7, 8]:
+	for old_version in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
 		var old_save := FileAccess.open(save_path, FileAccess.WRITE)
 		var old_save_data := {
 			"version": old_version,
@@ -297,11 +380,21 @@ func _run() -> void:
 				"cave_guardian_defeated": false,
 				"cave_treasure_claimed": false
 			}, true)
-		if old_version >= 8:
+		if old_version == 8:
 			old_save_data.merge({
 				"equipment_inventory": ["Traveler's Blade", "Wanderer's Coat"],
 				"equipped_weapon": "Traveler's Blade",
 				"equipped_armor": "Wanderer's Coat"
+			}, true)
+		if old_version >= 9:
+			old_save_data.merge({
+				"equipment_inventory": [
+					"Traveler's Blade", "Wanderer's Coat", "Traveler's Trousers", "Trail Boots"
+				],
+				"equipped_slots": {
+					"weapon": "Traveler's Blade", "armor": "Wanderer's Coat", "head": "",
+					"arms": "", "hands": "", "legs": "Traveler's Trousers", "feet": "Trail Boots"
+				}
 			}, true)
 		old_save.store_string(JSON.stringify(old_save_data))
 		old_save.close()
@@ -314,6 +407,9 @@ func _run() -> void:
 		_check(not migrated_game.get("salve_collected"), "Older saves should default exploration rewards to unclaimed")
 		_check(migrated_game.get("hero_name") == ("Legacy Hero" if old_version >= 5 else "Adventurer"), "Save migration should preserve or default the hero name")
 		_check(migrated_game.get("hero_class") == ("Mage" if old_version >= 5 else "Warrior"), "Save migration should preserve or default the hero class")
+		_check(migrated_game.get("hunter_contract_stage") == 0, "Older saves should not start the optional hunt")
+		_check(migrated_game.get("northern_tracks_found") == (migrated_game.get("quest_step") >= 2), "Save migration should infer completed northern evidence")
+		_check(migrated_game.get("southern_tracks_found") == (migrated_game.get("quest_step") >= 4), "Save migration should infer completed southern evidence")
 		_check(not migrated_game.get("in_cave"), "Older saves should default to outside the cave")
 		_check(not migrated_game.get("cave_guardian_defeated"), "Older saves should default cave progress to uncleared")
 		_check(not migrated_game.get("cave_treasure_claimed"), "Older saves should default cave treasure to unclaimed")
@@ -419,8 +515,10 @@ func _run() -> void:
 	_check(not save_ui_player.get("movement_enabled"), "The shop should pause player movement")
 	save_ui_game.call("_buy_shop_item", "Potion")
 	_check(save_ui_game.get("potions") == 1 and save_ui_game.get("gold") == 980, "Buying a potion should charge gold and add one potion")
+	_check(save_ui_game.get("gold_label").text == "Gold: 980 G", "The HUD should show the updated balance after purchases")
 	save_ui_game.call("_sell_shop_item", "Potion")
 	_check(save_ui_game.get("potions") == 0 and save_ui_game.get("gold") == 990, "Selling a potion should remove one and pay its sell price")
+	_check(save_ui_game.get("gold_label").text == "Gold: 990 G", "The HUD should show gold gained from sales")
 	save_ui_game.call("_buy_shop_item", "Potion")
 	save_ui_game.call("_buy_shop_item", "Iron Sword")
 	save_ui_game.call("_buy_shop_item", "Oak Staff")

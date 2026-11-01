@@ -5,7 +5,10 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 ## Current Playable Slice
 
 - Explore a tile-based village and forest clearing with solid world boundaries, trees, and buildings
-- Talk to Mira, complete two linked quests, and fight the Forest Shade and Bramble Wolf
+- Talk to Mira, investigate forest tracks, and complete two linked quests against the Forest Shade and Bramble Wolf
+- After restoring peace, accept Mira's optional hunter contract: examine clues, then fight Ashwing and Thornback in two targetable mixed encounters
+- Distinct enemy tactics include Ashwing's MP-draining Cinder bolt and Thornback's one-hit Shell guard; the wolf is fast and the Cave Sentinel wards itself
+- Every monster encounter awards gold on victory; battle results show the drop, and mixed encounters combine both monsters' gold
 - Trade with Rowan in the village: buy potions and gear, sell unequipped equipment, and equip one item in each weapon, body, head, arms, hands, legs, and feet slot
 - After restoring peace, explore an optional cave, face the Cave Sentinel's ward, and claim its one-time Crystal Heart reward
 - Earn gold for completing the quest; progress saves between sessions
@@ -24,6 +27,7 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - **E**: Talk to Mira, trade with Rowan, or continue dialogue
 - **I** or **Bag**: Open the character and inventory menu anywhere; compare/equip gear and drop unwanted items
 - **1-5** (or click): Attack, Ember magic, Guard, Potion, Flee
+- In mixed battles, click an enemy's target button before choosing an action
 - Ember costs 8 MP; victories award XP, and leveling up increases maximum HP and MP without restoring damage or spent MP
 - Sell potions and unequipped gear at Rowan's shop beside the village gate; equipped items must be unequipped before they can be sold or dropped
 - Gear for all seven equipment slots adds physical/Ember damage or reduces incoming hits
@@ -31,6 +35,7 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - **Save / Load**: Open the three-slot save menu; overwriting a used slot requires confirmation
 - Quest, combat, equipment, inventory, and world position progress auto-save as you play; loaded slots become the active auto-save
 - Use **New Game** on the HUD at any time to start over; confirmation protects the active run, and other save slots remain unchanged
+- The compact HUD shows the current objective and survival/progression stats; detailed equipment is in the Bag menu
 
 ## Project Structure
 
@@ -59,13 +64,13 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 └── project.godot       # Godot project file
 ```
 
-## Next Steps (Phase 4-5)
+## Next Recommended Milestone
 
-1. **Content Creation**: Add character sprites, enemy designs, UI assets
-2. **Audio Implementation**: Battle BGM, zone music, SFX
-3. **UI Polish**: Menu animations, HUD elements
-4. **Testing**: Playtest sessions, bug fixes
-5. **Build Configuration**: Export presets for all platforms
+1. **Playtest and balance**: Check clue readability, mixed-fight difficulty, class balance, and whether the hunter contract feels rewarding
+2. **Replace generated art**: Add authored hero, monster, environment, and UI assets while preserving the current gameplay layout
+3. **Add audio**: Give Greenvale, exploration clues, and each battle a distinct sound and music identity
+4. **Expand the world deliberately**: Build another connected location or party member only after the current quest-and-combat loop is fun
+5. **Prepare builds**: Add export presets and platform-specific testing after the content and controls stabilize
 
 ## Technical Notes
 

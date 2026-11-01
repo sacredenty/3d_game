@@ -1,17 +1,20 @@
 extends Node
 
-signal finished(outcome: String, hp: int, mp: int, potion_count: int, experience: int)
+signal finished(outcome: String, hp: int, mp: int, potion_count: int, experience: int, gold: int)
 
 var enemy_name: String = "Shade"
 var enemy_max_hp: int = 112
 var enemy_hp: int = 112
 var enemy_damage: Vector2i = Vector2i(10, 15)
 var victory_experience: int = 80
+var victory_gold: int = 0
 var enemy_color := Color("647b9a")
 var weakness: String = "fire"
 var intent_pattern: PackedStringArray = PackedStringArray(["Heavy strike", "Shadow swipe", "Shadow swipe"])
 var intent_index: int = 0
 var enemy_warding: bool = false
+var additional_enemy: Dictionary = {}
+var target_index: int = 0
 var player_hp: int = 100
 var player_mp: int = 30
 var player_level: int = 1
@@ -31,6 +34,9 @@ var battle_outcome: String = ""
 
 var layer: CanvasLayer
 var enemy_hp_bar: ProgressBar
+var enemy_target_buttons: HBoxContainer
+var primary_target_button: Button
+var additional_target_button: Button
 var enemy_title: Label
 var battle_title: Label
 var intent_label: Label
@@ -66,18 +72,30 @@ func start_battle(
 		agility: int,
 		attack_bonus: int = 0,
 		magic_bonus: int = 0,
-		defense_bonus: int = 0
+		defense_bonus: int = 0,
+		additional_foe: Dictionary = {},
+		gold_reward: int = 0
 ) -> void:
 	enemy_name = foe_name
 	enemy_max_hp = foe_hp
 	enemy_hp = foe_hp
 	enemy_damage = foe_damage
 	victory_experience = xp_reward
+	victory_gold = gold_reward
 	enemy_color = foe_color
 	weakness = foe_weakness
 	intent_pattern = foe_intents
 	intent_index = 0
 	enemy_warding = false
+	additional_enemy = {}
+	target_index = 0
+	if not additional_foe.is_empty():
+		additional_enemy = additional_foe.duplicate(true)
+		additional_enemy["max_hp"] = int(additional_foe["hp"])
+		additional_enemy["intent_index"] = 0
+		additional_enemy["warding"] = false
+		victory_experience += int(additional_foe.get("xp", 0))
+		victory_gold += int(additional_foe.get("gold", 0))
 	player_hp = current_hp
 	player_mp = current_mp
 	player_level = level
@@ -93,7 +111,7 @@ func start_battle(
 	armor_defense = defense_bonus
 	active = true
 	battle_outcome = ""
-	enemy_art.texture = _make_enemy_texture(enemy_color)
+	enemy_art.texture = _make_enemy_texture(enemy_color, enemy_name)
 	battle_title.text = "CAVE ENCOUNTER" if enemy_name == "Cave Sentinel" else "FOREST ENCOUNTER"
 	_update_ui()
 	battle_log.text = "Choose an action. Watch the enemy's intent."
@@ -116,8 +134,8 @@ func _build_ui() -> void:
 	screen.add_child(backdrop)
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(160, 68)
-	panel.size = Vector2(640, 464)
+	panel.position = Vector2(160, 50)
+	panel.size = Vector2(640, 500)
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color("24372f")
 	panel_style.border_color = Color("b99a69")
@@ -147,6 +165,18 @@ func _build_ui() -> void:
 	enemy_title = _make_label("", 21, Color("f3d890"))
 	enemy_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(enemy_title)
+	enemy_target_buttons = HBoxContainer.new()
+	enemy_target_buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+	enemy_target_buttons.add_theme_constant_override("separation", 8)
+	content.add_child(enemy_target_buttons)
+	primary_target_button = _make_button("")
+	primary_target_button.custom_minimum_size = Vector2(200, 34)
+	primary_target_button.pressed.connect(_select_enemy.bind(0))
+	enemy_target_buttons.add_child(primary_target_button)
+	additional_target_button = _make_button("")
+	additional_target_button.custom_minimum_size = Vector2(200, 34)
+	additional_target_button.pressed.connect(_select_enemy.bind(1))
+	enemy_target_buttons.add_child(additional_target_button)
 	intent_label = _make_label("", 14, Color("f3c17b"))
 	intent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(intent_label)
@@ -156,6 +186,7 @@ func _build_ui() -> void:
 	enemy_hp_bar = _make_bar(Color("d16c62"))
 	enemy_hp_bar.custom_minimum_size.y = 22
 	content.add_child(enemy_hp_bar)
+	enemy_target_buttons.hide()
 	battle_log = _make_label("", 15, Color("fff0d0"))
 	battle_log.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	battle_log.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -301,35 +332,50 @@ func _action_message(message: String) -> void:
 	_update_ui()
 
 func _after_player_action() -> void:
-	if enemy_hp == 0:
+	if not _enemy_is_alive(0) and not _enemy_is_alive(1):
 		_finish("victory")
 		return
-	var damage := randi_range(enemy_damage.x, enemy_damage.y) + (player_level - 1) * 2
-	var intent := _current_intent()
-	if intent == "Stone ward":
-		enemy_warding = true
-		battle_log.text += "\n%s raises a stone ward. Its next hit will be reduced." % enemy_name
-		if not intent_pattern.is_empty():
-			intent_index = (intent_index + 1) % intent_pattern.size()
-		_update_ui()
+	for foe_index in range(2 if not additional_enemy.is_empty() else 1):
+		if not _enemy_is_alive(foe_index):
+			continue
+		_enemy_turn(foe_index)
+		if player_hp == 0:
+			break
+	if target_index == 0 and not _enemy_is_alive(0) and _enemy_is_alive(1):
+		target_index = 1
+	elif target_index == 1 and not _enemy_is_alive(1) and _enemy_is_alive(0):
+		target_index = 0
+	_update_ui()
+	if player_hp == 0:
+		_finish("defeat")
+
+func _enemy_turn(foe_index: int) -> void:
+	var intent := _intent_for(foe_index)
+	var foe_name := _enemy_name_for(foe_index)
+	if intent == "Stone ward" or intent == "Shell guard":
+		_set_enemy_warding(foe_index, true)
+		battle_log.text += "\n%s raises its guard. Its next hit will be reduced." % foe_name
+		_advance_enemy_intent(foe_index)
 		return
+	var damage_range: Vector2i = enemy_damage if foe_index == 0 else additional_enemy["damage"]
+	var damage := randi_range(damage_range.x, damage_range.y) + (player_level - 1) * 2
 	if intent.begins_with("Heavy"):
 		damage = ceili(damage * 1.65)
 	damage = maxi(damage - armor_defense, 1)
 	if guarding:
 		damage = ceili(damage * (0.25 if hero_class == "Warrior" else 0.4))
 		guarding = false
-	var evaded := randi_range(1, 100) <= _dodge_chance()
-	if evaded:
-		battle_log.text += "\n%s uses %s, but you evade it!" % [enemy_name, intent.to_lower()]
+	if randi_range(1, 100) <= _dodge_chance():
+		battle_log.text += "\n%s uses %s, but you evade it!" % [foe_name, intent.to_lower()]
 	else:
 		player_hp = maxi(player_hp - damage, 0)
-		battle_log.text += "\n%s uses %s for %d damage." % [enemy_name, intent.to_lower(), damage]
-	if not intent_pattern.is_empty():
-		intent_index = (intent_index + 1) % intent_pattern.size()
-	_update_ui()
-	if player_hp == 0:
-		_finish("defeat")
+		battle_log.text += "\n%s uses %s for %d damage." % [foe_name, intent.to_lower(), damage]
+		if intent == "Cinder bolt":
+			var drained_mp := mini(player_mp, 4)
+			player_mp -= drained_mp
+			if drained_mp > 0:
+				battle_log.text += " It drains %d MP." % drained_mp
+	_advance_enemy_intent(foe_index)
 
 func _finish(outcome: String) -> void:
 	active = false
@@ -337,20 +383,33 @@ func _finish(outcome: String) -> void:
 	actions.hide()
 	match outcome:
 		"victory":
-			battle_log.text = "%s is defeated! You earned %d XP." % [enemy_name, victory_experience]
+			battle_log.text = "%s defeated! You earned %d XP and found %d G." % [
+				"Your foes are" if not additional_enemy.is_empty() else enemy_name + " is",
+				victory_experience,
+				victory_gold
+			]
 		"defeat":
-			battle_log.text = "You were defeated by %s. Mira will help you recover." % enemy_name
+			battle_log.text = "You were defeated by %s. Mira will help you recover." % _enemy_name_for(target_index)
 	result_button.text = "Return to the forest" if outcome == "victory" else "Recover at the village"
 	result_button.show()
 
 func _leave_battle() -> void:
 	layer.hide()
-	finished.emit(battle_outcome, player_hp, player_mp, potions, victory_experience if battle_outcome == "victory" else 0)
+	finished.emit(
+		battle_outcome,
+		player_hp,
+		player_mp,
+		potions,
+		victory_experience if battle_outcome == "victory" else 0,
+		victory_gold if battle_outcome == "victory" else 0
+	)
 
 func _update_ui() -> void:
 	if enemy_hp_bar == null:
 		return
-	enemy_hp_bar.value = float(enemy_hp) / float(enemy_max_hp) * 100.0
+	var selected_hp := _enemy_hp_for(target_index)
+	var selected_max_hp := _enemy_max_hp_for(target_index)
+	enemy_hp_bar.value = float(selected_hp) / float(selected_max_hp) * 100.0
 	player_status.text = "%s  ·  %s LV %d  ·  HP %d/%d  ·  MP %d/%d" % [
 		hero_name,
 		hero_class,
@@ -365,38 +424,112 @@ func _update_ui() -> void:
 	magic_button.disabled = player_mp < 8
 	magic_button.text = "Magic (8 MP)" if player_mp >= 8 else "Magic (need MP)"
 	if enemy_title != null:
-		enemy_title.text = "%s  ·  %d HP" % [enemy_name, enemy_hp]
+		enemy_title.text = "%s  ·  %d / %d HP" % [
+			_enemy_name_for(target_index), selected_hp, selected_max_hp
+		]
+		primary_target_button.text = "1: %s  ·  %d HP" % [enemy_name, enemy_hp]
+		primary_target_button.disabled = not _enemy_is_alive(0)
+		additional_target_button.visible = not additional_enemy.is_empty()
+		if not additional_enemy.is_empty():
+			additional_target_button.text = "2: %s  ·  %d HP" % [
+				str(additional_enemy["name"]), int(additional_enemy["hp"])
+			]
+			additional_target_button.disabled = not _enemy_is_alive(1)
+		enemy_target_buttons.visible = not additional_enemy.is_empty()
+		enemy_art.texture = _make_enemy_texture(
+			_enemy_color_for(target_index), _enemy_name_for(target_index)
+		)
 	if intent_label != null:
-		intent_label.text = "Enemy warded  ·  Intent: %s" % _current_intent() if enemy_warding \
+		intent_label.text = "Enemy warded  ·  Intent: %s" % _current_intent() if _is_enemy_warding(target_index) \
 			else "Intent: %s" % _current_intent()
 	if weakness_label != null:
-		weakness_label.text = "Weak to Ember" if weakness == "fire" else "Weak to physical attacks"
+		weakness_label.text = "Weak to Ember" if _enemy_weakness_for(target_index) == "fire" \
+			else "Weak to physical attacks"
 
 func _current_intent() -> String:
-	if intent_pattern.is_empty():
+	return _intent_for(target_index)
+
+func _intent_for(foe_index: int) -> String:
+	var pattern: PackedStringArray = intent_pattern if foe_index == 0 else additional_enemy.get(
+		"intents", PackedStringArray()
+	)
+	var index := intent_index if foe_index == 0 else int(additional_enemy.get("intent_index", 0))
+	if pattern.is_empty():
 		return "Strike"
-	return intent_pattern[intent_index]
+	return pattern[index]
+
+func _enemy_is_alive(foe_index: int) -> bool:
+	return enemy_hp > 0 if foe_index == 0 else (
+		not additional_enemy.is_empty() and int(additional_enemy.get("hp", 0)) > 0
+	)
+
+func _enemy_name_for(foe_index: int) -> String:
+	return enemy_name if foe_index == 0 else str(additional_enemy.get("name", "Enemy"))
+
+func _enemy_hp_for(foe_index: int) -> int:
+	return enemy_hp if foe_index == 0 else int(additional_enemy.get("hp", 0))
+
+func _enemy_max_hp_for(foe_index: int) -> int:
+	return enemy_max_hp if foe_index == 0 else int(additional_enemy.get("max_hp", 1))
+
+func _enemy_weakness_for(foe_index: int) -> String:
+	return weakness if foe_index == 0 else str(additional_enemy.get("weakness", "physical"))
+
+func _enemy_color_for(foe_index: int) -> Color:
+	return enemy_color if foe_index == 0 else additional_enemy.get("color", Color("647b9a"))
+
+func _is_enemy_warding(foe_index: int) -> bool:
+	return enemy_warding if foe_index == 0 else bool(additional_enemy.get("warding", false))
+
+func _set_enemy_warding(foe_index: int, value: bool) -> void:
+	if foe_index == 0:
+		enemy_warding = value
+	else:
+		additional_enemy["warding"] = value
+
+func _advance_enemy_intent(foe_index: int) -> void:
+	var pattern: PackedStringArray = intent_pattern if foe_index == 0 else additional_enemy.get(
+		"intents", PackedStringArray()
+	)
+	if pattern.is_empty():
+		return
+	if foe_index == 0:
+		intent_index = (intent_index + 1) % pattern.size()
+	else:
+		additional_enemy["intent_index"] = (
+			int(additional_enemy.get("intent_index", 0)) + 1
+		) % pattern.size()
+
+func _select_enemy(foe_index: int) -> void:
+	if not active or not _enemy_is_alive(foe_index):
+		return
+	target_index = foe_index
+	_update_ui()
 
 func _damage_enemy(base_damage: int, damage_kind: String, message_format: String) -> String:
 	var damage := base_damage
 	var weakness_message := ""
-	if weakness == damage_kind:
+	var target_name := _enemy_name_for(target_index)
+	if _enemy_weakness_for(target_index) == damage_kind:
 		damage = ceili(damage * 1.5)
 		weakness_message = " Weakness!"
-	if enemy_warding:
+	if _is_enemy_warding(target_index):
 		damage = ceili(damage * 0.5)
-		enemy_warding = false
+		_set_enemy_warding(target_index, false)
 		weakness_message += " The ward absorbs part of the blow."
-	enemy_hp = maxi(enemy_hp - damage, 0)
-	return "%s.%s" % [message_format % [enemy_name, damage], weakness_message]
+	if target_index == 0:
+		enemy_hp = maxi(enemy_hp - damage, 0)
+	else:
+		additional_enemy["hp"] = maxi(int(additional_enemy["hp"]) - damage, 0)
+	return "%s.%s" % [message_format % [target_name, damage], weakness_message]
 
 func _dodge_chance() -> int:
 	return mini(hero_agility * 2, 40) if hero_class == "Rogue" else 0
 
-func _make_enemy_texture(color: Color) -> Texture2D:
+func _make_enemy_texture(color: Color, foe_name: String = "") -> Texture2D:
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
 	image.fill(Color.TRANSPARENT)
-	if enemy_name == "Bramble Wolf":
+	if foe_name == "Bramble Wolf":
 		image.fill_rect(Rect2i(4, 12, 19, 9), color)
 		image.fill_rect(Rect2i(18, 8, 10, 11), color.lightened(0.08))
 		image.fill_rect(Rect2i(24, 13, 7, 5), color.lightened(0.12))
@@ -407,6 +540,27 @@ func _make_enemy_texture(color: Color) -> Texture2D:
 		image.fill_rect(Rect2i(23, 18, 4, 10), color.darkened(0.2))
 		image.fill_rect(Rect2i(2, 11, 5, 3), color.darkened(0.15))
 		image.fill_rect(Rect2i(24, 11, 2, 2), Color("fff3bf"))
+		return ImageTexture.create_from_image(image)
+	if foe_name == "Ashwing":
+		image.fill_rect(Rect2i(12, 10, 9, 13), color)
+		image.fill_rect(Rect2i(5, 6, 9, 7), color.lightened(0.18))
+		image.fill_rect(Rect2i(19, 6, 9, 7), color.lightened(0.18))
+		image.fill_rect(Rect2i(2, 4, 8, 3), Color("f0b956"))
+		image.fill_rect(Rect2i(23, 4, 7, 3), Color("f0b956"))
+		image.fill_rect(Rect2i(14, 14, 2, 2), Color("fff0b0"))
+		image.fill_rect(Rect2i(20, 14, 2, 2), Color("fff0b0"))
+		image.fill_rect(Rect2i(13, 23, 3, 6), color.darkened(0.2))
+		image.fill_rect(Rect2i(18, 23, 3, 6), color.darkened(0.2))
+		return ImageTexture.create_from_image(image)
+	if foe_name == "Thornback":
+		image.fill_rect(Rect2i(5, 12, 22, 14), color.darkened(0.15))
+		image.fill_rect(Rect2i(8, 8, 17, 15), color)
+		for spike_x in [7, 13, 19, 25]:
+			image.fill_rect(Rect2i(spike_x, 5, 3, 8), color.lightened(0.2))
+		image.fill_rect(Rect2i(12, 15, 3, 3), Color("fff0b0"))
+		image.fill_rect(Rect2i(21, 15, 3, 3), Color("fff0b0"))
+		image.fill_rect(Rect2i(7, 24, 4, 5), color.darkened(0.3))
+		image.fill_rect(Rect2i(22, 24, 4, 5), color.darkened(0.3))
 		return ImageTexture.create_from_image(image)
 	image.fill_rect(Rect2i(5, 6, 22, 18), color.darkened(0.18))
 	image.fill_rect(Rect2i(8, 3, 16, 20), color)
