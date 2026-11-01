@@ -1,15 +1,20 @@
 extends Node2D
 
 const PLAYER_SCRIPT = preload("res://scripts/systems/overworld/player_controller.gd")
+const BATTLE_SCENE = preload("res://scenes/battle.tscn")
 const WORLD_SIZE := Vector2(1600.0, 960.0)
 const TILE_SIZE := 32
 const VILLAGE_EDGE := 640.0
 const FOREST_GATE := 720.0
 const CLEARING_POSITION := Vector2(1330.0, 448.0)
+const WOLF_CLEARING_POSITION := Vector2(1360.0, 704.0)
+const SALVE_POSITION := Vector2(880.0, 448.0)
+const CACHE_POSITION := Vector2(1210.0, 390.0)
+const WAYSTONE_POSITION := Vector2(1150.0, 570.0)
+const CAMPFIRE_POSITION := Vector2(1220.0, 660.0)
 const PLAYER_MAX_HP := 100
-const ENEMY_MAX_HP := 112
 const PROGRESS_SAVE_PATH := "user://greenvale_progress.json"
-const SAVE_VERSION := 2
+const SAVE_VERSION := 4
 const STARTING_MP := 30
 
 var player: CharacterBody2D
@@ -22,18 +27,20 @@ var dialogue_lines: Array[String] = []
 var dialogue_index: int = 0
 var dialogue_active: bool = false
 var battle_active: bool = false
-var battle_won: bool = false
-var battle_fled: bool = false
 var encounter_started: bool = false
 var player_hp: int = PLAYER_MAX_HP
 var player_mp: int = STARTING_MP
 var player_level: int = 1
 var player_experience: int = 0
-var enemy_hp: int = ENEMY_MAX_HP
-var potions: int = 1
+var potions: int = 0
 var gold: int = 0
-var guarding: bool = false
+var salve_collected: bool = false
+var cache_opened: bool = false
+var waystone_discovered: bool = false
 var progress_save_path: String = PROGRESS_SAVE_PATH
+var battle_instance: Node
+var active_encounter: String = ""
+var exploration_markers: Dictionary = {}
 
 var hud_layer: CanvasLayer
 var objective_label: Label
@@ -47,13 +54,6 @@ var prompt_label: Label
 var dialogue_panel: PanelContainer
 var dialogue_label: Label
 var dialogue_hint: Label
-var battle_overlay: ColorRect
-var battle_player_status: Label
-var enemy_hp_bar: ProgressBar
-var battle_log: Label
-var potion_button: Button
-var magic_button: Button
-var battle_result_button: Button
 var new_game_button: Button
 var new_game_dialog: ConfirmationDialog
 
@@ -63,6 +63,7 @@ func _ready() -> void:
 	_build_npc()
 	_build_interface()
 	load_progress(progress_save_path)
+	_sync_exploration_markers()
 	_update_hud()
 
 func _build_world() -> void:
@@ -95,11 +96,17 @@ func _build_world() -> void:
 	_add_rect_obstacle(Vector2(342, 370), Vector2(68, 42))
 	_add_house(Vector2(184, 250), Color("a54f42"), Color("d6bd8b"))
 	_add_house(Vector2(456, 258), Color("596b55"), Color("c8b17c"))
+	_add_world_marker(SALVE_POSITION, "salve")
+	_add_world_marker(CACHE_POSITION, "cache")
+	_add_world_marker(WAYSTONE_POSITION, "waystone")
+	_add_world_marker(CAMPFIRE_POSITION, "campfire")
 
 func _is_path_position(position: Vector2) -> bool:
 	if position.x < 1140.0 and position.y > 368.0 and position.y < 544.0:
 		return true
-	return position.distance_to(CLEARING_POSITION) < 150.0
+	return position.distance_to(CLEARING_POSITION) < 150.0 \
+		or (position.x > 1120.0 and position.y > 544.0 and position.y < 820.0) \
+		or position.distance_to(WOLF_CLEARING_POSITION) < 150.0
 
 func _is_building_position(position: Vector2) -> bool:
 	return Rect2(72, 120, 224, 220).has_point(position) \
@@ -193,8 +200,12 @@ func _paint_world() -> void:
 				source = Vector2i(3, 0)
 			if x in range(33, 37) and y in range(12, 20):
 				source = Vector2i(3, 0)
+			if x * TILE_SIZE > 1120 and y * TILE_SIZE > 544 and y * TILE_SIZE < 820:
+				source = Vector2i(3, 0)
 			if position.distance_to(CLEARING_POSITION) < 128.0:
 				source = Vector2i(2, 1) if position.distance_to(CLEARING_POSITION) < 82.0 else Vector2i(3, 0)
+			if position.distance_to(WOLF_CLEARING_POSITION) < 128.0:
+				source = Vector2i(2, 1) if position.distance_to(WOLF_CLEARING_POSITION) < 82.0 else Vector2i(3, 0)
 			if _is_building_position(position):
 				source = Vector2i(5, 1)
 			world_tiles.set_cell(Vector2i(x, y), 0, source)
@@ -230,6 +241,51 @@ func _make_tree_texture() -> Texture2D:
 	_pixel(image, 11, 22, 7, 7, Color("679357"))
 	_pixel(image, 29, 18, 6, 6, Color("6b9657"))
 	_pixel(image, 7, 33, 6, 5, Color("477c4d"))
+	return ImageTexture.create_from_image(image)
+
+func _add_world_marker(position: Vector2, marker: String) -> void:
+	var sprite := Sprite2D.new()
+	sprite.name = marker.capitalize()
+	sprite.texture = _make_marker_texture(marker)
+	sprite.position = position
+	sprite.scale = Vector2(1.5, 1.5)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.z_index = 2
+	add_child(sprite)
+	exploration_markers[marker] = sprite
+
+func _make_marker_texture(marker: String) -> Texture2D:
+	var image := Image.create(24, 24, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	match marker:
+		"salve":
+			_pixel(image, 10, 4, 5, 3, Color("d9c58d"))
+			_pixel(image, 8, 7, 9, 12, Color("b84945"))
+			_pixel(image, 9, 9, 7, 8, Color("e27563"))
+			_pixel(image, 5, 15, 5, 3, Color("5b8b4e"))
+			_pixel(image, 14, 14, 5, 4, Color("4b7846"))
+			_pixel(image, 7, 18, 10, 2, Color("d9c58d"))
+		"cache":
+			_pixel(image, 3, 10, 18, 11, Color("704b30"))
+			_pixel(image, 4, 7, 16, 5, Color("b98b4f"))
+			_pixel(image, 5, 12, 14, 7, Color("986838"))
+			_pixel(image, 11, 11, 3, 7, Color("f1d27a"))
+			_pixel(image, 4, 19, 3, 3, Color("d0aa69"))
+			_pixel(image, 17, 19, 3, 3, Color("d0aa69"))
+		"waystone":
+			_pixel(image, 6, 3, 12, 19, Color("6b7771"))
+			_pixel(image, 8, 5, 8, 15, Color("9ba397"))
+			_pixel(image, 10, 8, 4, 9, Color("c6b67a"))
+			_pixel(image, 11, 10, 2, 5, Color("e8dba4"))
+			_pixel(image, 4, 20, 16, 3, Color("535f56"))
+		"campfire":
+			_pixel(image, 4, 16, 16, 4, Color("6d4931"))
+			_pixel(image, 6, 14, 12, 3, Color("9a6338"))
+			_pixel(image, 9, 6, 7, 9, Color("c94f35"))
+			_pixel(image, 10, 9, 5, 7, Color("f08c3d"))
+			_pixel(image, 11, 11, 3, 4, Color("f8d36b"))
+			_pixel(image, 5, 20, 3, 2, Color("d1b987"))
+			_pixel(image, 16, 20, 3, 2, Color("d1b987"))
 	return ImageTexture.create_from_image(image)
 
 func _add_house(position: Vector2, roof_color: Color, wall_color: Color) -> void:
@@ -276,23 +332,6 @@ func _make_character_texture(coat: Color, hair: Color, trim: Color) -> Texture2D
 	_pixel(image, 13, 26, 5, 5, Color("474b5c"))
 	_pixel(image, 5, 30, 7, 2, Color("433a34"))
 	_pixel(image, 12, 30, 7, 2, Color("433a34"))
-	return ImageTexture.create_from_image(image)
-
-func _make_shade_texture() -> Texture2D:
-	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	image.fill(Color.TRANSPARENT)
-	_pixel(image, 9, 6, 14, 3, Color("303b52"))
-	_pixel(image, 5, 9, 22, 14, Color("485774"))
-	_pixel(image, 8, 6, 16, 3, Color("647b9a"))
-	_pixel(image, 3, 13, 5, 10, Color("485774"))
-	_pixel(image, 24, 11, 5, 12, Color("485774"))
-	_pixel(image, 7, 23, 18, 5, Color("37435d"))
-	_pixel(image, 9, 27, 4, 4, Color("a8a4c7"))
-	_pixel(image, 19, 27, 4, 4, Color("a8a4c7"))
-	_pixel(image, 10, 13, 4, 3, Color("f3d987"))
-	_pixel(image, 19, 13, 4, 3, Color("f3d987"))
-	_pixel(image, 11, 14, 2, 2, Color("fff3bf"))
-	_pixel(image, 20, 14, 2, 2, Color("fff3bf"))
 	return ImageTexture.create_from_image(image)
 
 func _build_player() -> void:
@@ -425,7 +464,6 @@ func _build_interface() -> void:
 	dialogue_content.add_child(dialogue_hint)
 	dialogue_panel.hide()
 
-	_build_battle_interface(screen)
 	new_game_dialog = ConfirmationDialog.new()
 	new_game_dialog.title = "Start a new game?"
 	new_game_dialog.dialog_text = "This will replace your saved Greenvale progress."
@@ -433,68 +471,6 @@ func _build_interface() -> void:
 	new_game_dialog.confirmed.connect(_start_fresh_game)
 	screen.add_child(new_game_dialog)
 	_update_hud()
-
-func _build_battle_interface(screen: Control) -> void:
-	battle_overlay = ColorRect.new()
-	battle_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	battle_overlay.color = Color(0.03, 0.06, 0.08, 0.82)
-	battle_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	screen.add_child(battle_overlay)
-	battle_overlay.hide()
-
-	var panel := _make_panel(battle_overlay, Rect2(160, 76, 640, 448))
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 13)
-	panel.add_child(content)
-	content.add_child(_make_label("A WILD SHADE APPEARS", 20, Color("f3d890")))
-	battle_player_status = _make_label("", 14, Color("c1d0c0"))
-	battle_player_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(battle_player_status)
-	var enemy_sprite := TextureRect.new()
-	enemy_sprite.texture = _make_shade_texture()
-	enemy_sprite.custom_minimum_size = Vector2(72, 72)
-	enemy_sprite.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	enemy_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	content.add_child(enemy_sprite)
-	var enemy_title := _make_label("SHADE  ·  80 XP", 14, Color("d7c8e8"))
-	enemy_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(enemy_title)
-	enemy_hp_bar = _make_bar(Color("d16c62"))
-	enemy_hp_bar.custom_minimum_size.y = 22
-	content.add_child(enemy_hp_bar)
-	battle_log = _make_label("The shade blocks the path.", 15, Color("fff0d0"))
-	battle_log.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	battle_log.custom_minimum_size.y = 44
-	content.add_child(battle_log)
-
-	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 8)
-	content.add_child(actions)
-	var attack_button := _make_button("Attack")
-	attack_button.custom_minimum_size.x = 116
-	attack_button.pressed.connect(_attack)
-	actions.add_child(attack_button)
-	magic_button = _make_button("Magic (8 MP)")
-	magic_button.custom_minimum_size.x = 116
-	magic_button.pressed.connect(_cast_magic)
-	actions.add_child(magic_button)
-	var guard_button := _make_button("Guard")
-	guard_button.custom_minimum_size.x = 116
-	guard_button.pressed.connect(_guard)
-	actions.add_child(guard_button)
-	potion_button = _make_button("Potion (1)")
-	potion_button.custom_minimum_size.x = 116
-	potion_button.pressed.connect(_use_potion)
-	actions.add_child(potion_button)
-	var flee_button := _make_button("Flee")
-	flee_button.custom_minimum_size.x = 116
-	flee_button.pressed.connect(_flee)
-	actions.add_child(flee_button)
-
-	battle_result_button = _make_button("Return to the village")
-	battle_result_button.pressed.connect(_leave_battle)
-	battle_result_button.hide()
-	content.add_child(battle_result_button)
 
 func _make_panel(parent: Control, rect: Rect2) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -558,30 +534,18 @@ func _process(_delta: float) -> void:
 		return
 	_update_prompt()
 	if quest_step == 1 and not encounter_started and player.global_position.distance_to(CLEARING_POSITION) < 76.0:
-		_start_battle()
+		_start_battle("shade")
+	elif quest_step == 3 and not encounter_started and player.global_position.distance_to(WOLF_CLEARING_POSITION) < 76.0:
+		_start_battle("wolf")
 
 func _unhandled_input(event: InputEvent) -> void:
-	if battle_active and event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
-			KEY_A, KEY_1:
-				_attack()
-			KEY_M, KEY_2:
-				_cast_magic()
-			KEY_G, KEY_3:
-				_guard()
-			KEY_P, KEY_4:
-				_use_potion()
-			KEY_F, KEY_5, KEY_ESCAPE:
-				_flee()
-			_:
-				return
-		get_viewport().set_input_as_handled()
-		return
 	if event.is_action_pressed("interact") and not event.is_echo() and not battle_active:
 		if dialogue_active:
 			_advance_dialogue()
 		elif player.global_position.distance_to(npc.global_position) < 76.0:
 			_talk_to_mira()
+		else:
+			_interact_with_world()
 		get_viewport().set_input_as_handled()
 
 func _update_prompt() -> void:
@@ -591,25 +555,107 @@ func _update_prompt() -> void:
 	if player.global_position.distance_to(npc.global_position) < 76.0:
 		prompt_label.text = "E  Talk to Mira"
 		prompt_panel.show()
+	elif _near_world_object(SALVE_POSITION) and not salve_collected:
+		prompt_label.text = "E  Pick up a healing potion"
+		prompt_panel.show()
+	elif _near_world_object(CACHE_POSITION) and not cache_opened:
+		prompt_label.text = "E  Open the old supply cache"
+		prompt_panel.show()
+	elif _near_world_object(WAYSTONE_POSITION) and not waystone_discovered:
+		prompt_label.text = "E  Read the ancient waystone"
+		prompt_panel.show()
+	elif _near_world_object(CAMPFIRE_POSITION):
+		prompt_label.text = "E  Rest at the campfire"
+		prompt_panel.show()
 	elif quest_step == 1 and player.global_position.distance_to(CLEARING_POSITION) < 210.0:
-		prompt_label.text = "The forest clearing is just ahead..."
+		prompt_label.text = "The shade's clearing is just ahead..."
+		prompt_panel.show()
+	elif quest_step == 3 and player.global_position.distance_to(WOLF_CLEARING_POSITION) < 210.0:
+		prompt_label.text = "A growl echoes from the southern trail..."
 		prompt_panel.show()
 	else:
 		prompt_panel.hide()
 
+func _near_world_object(position: Vector2) -> bool:
+	return player.global_position.distance_to(position) < 72.0
+
+func _interact_with_world() -> void:
+	if _near_world_object(SALVE_POSITION) and not salve_collected:
+		salve_collected = true
+		potions += 1
+		_sync_exploration_markers()
+		_show_notice("You found a healing potion tucked beside the trail.")
+	elif _near_world_object(CACHE_POSITION) and not cache_opened:
+		cache_opened = true
+		gold += 40
+		_sync_exploration_markers()
+		_show_notice("The old cache holds 40 gold.")
+	elif _near_world_object(WAYSTONE_POSITION) and not waystone_discovered:
+		waystone_discovered = true
+		_award_experience(25)
+		_sync_exploration_markers()
+		_show_notice("The waystone glows with an old memory. You gained 25 XP.")
+	elif _near_world_object(CAMPFIRE_POSITION):
+		var was_injured := player_hp < max_hp() or player_mp < max_mp()
+		player_hp = max_hp()
+		player_mp = max_mp()
+		_show_notice("You rest by the fire and recover your strength." if was_injured else "You enjoy a quiet moment by the fire.")
+	else:
+		return
+	var save_error := save_progress(progress_save_path)
+	if save_error != OK:
+		push_error("Could not save Greenvale progress: %s" % error_string(save_error))
+	_update_hud()
+
+func _show_notice(message: String) -> void:
+	dialogue_lines = [message]
+	dialogue_index = 0
+	dialogue_active = true
+	dialogue_panel.show()
+	_show_dialogue_line()
+
+func _sync_exploration_markers() -> void:
+	if exploration_markers.is_empty():
+		return
+	exploration_markers["salve"].visible = not salve_collected
+	exploration_markers["cache"].visible = not cache_opened
+	exploration_markers["waystone"].visible = not waystone_discovered
+
 func _talk_to_mira() -> void:
+	var save_error: Error
 	if quest_step == 0:
 		dialogue_lines = [
 			"Mira: The forest path has gone quiet. Something has driven the shades out of the old clearing.",
 			"Could you check the clearing east of here? Take this potion. I will keep the village safe."
 		]
 		quest_step = 1
-		potions = 1
-		var save_error := save_progress(progress_save_path)
+		potions = maxi(potions, 1)
+		save_error = save_progress(progress_save_path)
 		if save_error != OK:
 			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
 	elif quest_step == 1:
-		dialogue_lines = ["Mira: Follow the dirt path east. The clearing is beyond the old gate."]
+		dialogue_lines = ["Mira: Follow the dirt path east. The shade is waiting in the northern clearing."]
+	elif quest_step == 2:
+		dialogue_lines = [
+			"Mira: The shade is gone! Take these 75 gold and a fresh potion.",
+			"Something else is stalking the southern forest trail. Could you investigate?"
+		]
+		quest_step = 3
+		gold += 75
+		potions += 1
+		encounter_started = false
+		save_error = save_progress(progress_save_path)
+		if save_error != OK:
+			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
+	elif quest_step == 3:
+		dialogue_lines = ["Mira: Head south from the shade's clearing. The tracks lead to another open glade."]
+	elif quest_step == 4:
+		dialogue_lines = ["Mira: You drove the wolf away too! Here is 125 gold. Greenvale is safe again."]
+		quest_step = 5
+		gold += 125
+		save_error = save_progress(progress_save_path)
+		if save_error != OK:
+			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
 	else:
 		dialogue_lines = ["Mira: Greenvale is peaceful again. Thank you, friend."]
 	dialogue_index = 0
@@ -630,110 +676,43 @@ func _show_dialogue_line() -> void:
 	dialogue_label.text = dialogue_lines[dialogue_index]
 	dialogue_hint.text = "E  Continue  (%d/%d)" % [dialogue_index + 1, dialogue_lines.size()]
 
-func _start_battle() -> void:
+func _start_battle(encounter: String) -> void:
 	encounter_started = true
 	battle_active = true
-	battle_won = false
-	battle_fled = false
-	enemy_hp = ENEMY_MAX_HP
+	active_encounter = encounter
 	player.set("movement_enabled", false)
-	battle_log.text = "A shade lunges from the trees! Choose an action."
-	battle_result_button.hide()
-	_set_battle_actions_visible(true)
-	battle_overlay.show()
-	_update_battle_hud()
-
-func _attack() -> void:
-	if not battle_active:
-		return
-	var damage := randi_range(18, 25) + (player_level - 1) * 3
-	enemy_hp = maxi(enemy_hp - damage, 0)
-	_log_player_action("You attack for %d damage." % damage)
-	_update_battle_hud()
-	if enemy_hp == 0:
-		_finish_battle(true)
+	var enemy: Dictionary
+	if encounter == "wolf":
+		enemy = {
+			"name": "Bramble Wolf", "hp": 164, "damage": Vector2i(13, 19),
+			"xp": 130, "color": Color("a96f58"), "weakness": "physical",
+			"intents": PackedStringArray(["Quick bite", "Heavy pounce", "Quick bite"])
+		}
 	else:
-		_enemy_turn()
+		enemy = {
+			"name": "Forest Shade", "hp": 112, "damage": Vector2i(10, 15),
+			"xp": 80, "color": Color("647b9a"), "weakness": "fire",
+			"intents": PackedStringArray(["Heavy strike", "Shadow swipe", "Shadow swipe"])
+		}
+	battle_instance = BATTLE_SCENE.instantiate()
+	add_child(battle_instance)
+	battle_instance.connect("finished", _on_battle_finished)
+	battle_instance.call("start_battle",
+		enemy["name"], enemy["hp"], enemy["damage"], enemy["xp"], enemy["color"],
+		enemy["weakness"], enemy["intents"],
+		player_hp, player_mp, player_level, potions
+	)
 
-func _cast_magic() -> void:
-	if not battle_active or player_mp < 8:
-		return
-	player_mp -= 8
-	var damage := 34 + (player_level - 1) * 4
-	enemy_hp = maxi(enemy_hp - damage, 0)
-	_log_player_action("You cast Ember for %d damage. (-8 MP)" % damage)
-	_update_battle_hud()
-	_update_hud()
-	if enemy_hp == 0:
-		_finish_battle(true)
-	else:
-		_enemy_turn()
-
-func _guard() -> void:
-	if not battle_active:
-		return
-	guarding = true
-	_log_player_action("You guard. The next hit will be reduced.")
-	_enemy_turn()
-
-func _use_potion() -> void:
-	if not battle_active or potions <= 0 or player_hp >= max_hp():
-		return
-	var restored := mini(35, max_hp() - player_hp)
-	player_hp += restored
-	potions -= 1
-	_log_player_action("You use a potion and recover %d HP." % restored)
-	_update_battle_hud()
-	_enemy_turn()
-
-func _log_player_action(message: String) -> void:
-	battle_log.text = message
-	_update_battle_hud()
-
-func _flee() -> void:
-	if not battle_active:
-		return
+func _on_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, experience: int) -> void:
+	player_hp = hp
+	player_mp = mp
+	potions = potion_count
 	battle_active = false
-	battle_fled = true
-	_set_battle_actions_visible(false)
-	battle_log.text = "You retreat from the shade. Your quest is still waiting."
-	battle_result_button.text = "Retreat to the village"
-	battle_result_button.show()
-
-func _enemy_turn() -> void:
-	var damage := randi_range(10, 15) + (player_level - 1) * 2
-	if guarding:
-		damage = ceili(damage * 0.4)
-		guarding = false
-	player_hp = maxi(player_hp - damage, 0)
-	battle_log.text += "\nThe shade attacks for %d damage." % damage
-	_update_battle_hud()
-	_update_hud()
-	if player_hp == 0:
-		_finish_battle(false)
-
-func _finish_battle(victory: bool) -> void:
-	battle_active = false
-	battle_won = victory
-	_set_battle_actions_visible(false)
-	if victory:
-		battle_log.text = "The shade dissolves into the forest light!"
-		battle_result_button.text = "Return to the village"
-		var leveled_up := _award_experience(80)
-		battle_log.text += "\nYou earned 80 XP."
-		if leveled_up:
-			battle_log.text += " Level up! You are now level %d." % player_level
-	else:
-		battle_log.text = "You were defeated. Mira will help you recover."
-		battle_result_button.text = "Recover at the village"
-	battle_result_button.show()
-
-func _leave_battle() -> void:
-	battle_overlay.hide()
-	if battle_won:
-		quest_step = 2
-		gold += 75
-	elif battle_fled:
+	player.set("movement_enabled", true)
+	if outcome == "victory":
+		quest_step = 2 if active_encounter == "shade" else 4
+		_award_experience(experience)
+	elif outcome == "flee":
 		encounter_started = false
 		player.position = Vector2(560, 448)
 	else:
@@ -741,26 +720,13 @@ func _leave_battle() -> void:
 		player_mp = max_mp()
 		encounter_started = false
 		player.position = Vector2(250, 448)
-	battle_fled = false
-	player.set("movement_enabled", true)
+	active_encounter = ""
 	var save_error := save_progress(progress_save_path)
 	if save_error != OK:
 		push_error("Could not save Greenvale progress: %s" % error_string(save_error))
 	_update_hud()
-	if battle_won:
-		_show_completion_message()
-
-func _show_completion_message() -> void:
-	dialogue_lines = ["Mira: You made it back! Here is 75 gold for helping our village."]
-	dialogue_index = 0
-	dialogue_active = true
-	dialogue_panel.show()
-	_show_dialogue_line()
-
-func _set_battle_actions_visible(visible: bool) -> void:
-	var actions := battle_overlay.get_node_or_null("PanelContainer/VBoxContainer/HBoxContainer")
-	if actions != null:
-		actions.visible = visible
+	battle_instance.queue_free()
+	battle_instance = null
 
 func _update_hud() -> void:
 	if objective_label == null:
@@ -769,26 +735,21 @@ func _update_hud() -> void:
 		0:
 			objective_label.text = "Objective: Speak with Mira near the village gate."
 		1:
-			objective_label.text = "Objective: Follow the eastern path and clear the forest clearing."
+			objective_label.text = "Objective: Follow the northern trail and defeat the forest shade."
+		2:
+			objective_label.text = "Objective: Return to Mira for your reward."
+		3:
+			objective_label.text = "Objective: Investigate the southern trail and find the wolf."
+		4:
+			objective_label.text = "Objective: Return to Mira and report the wolf encounter."
 		_:
-			objective_label.text = "Quest complete: The forest path is safe. Explore Greenvale!"
+			objective_label.text = "Adventure complete: The forest is safe. Explore Greenvale!"
 	hp_bar.value = float(player_hp) / float(max_hp()) * 100.0
 	mp_bar.value = float(player_mp) / float(max_mp()) * 100.0
 	progression_label.text = "LV %d  ·  %d / %d XP" % [player_level, player_experience, experience_to_next_level()]
 	experience_bar.value = float(player_experience) / float(experience_to_next_level()) * 100.0
 	gold_label.text = "%d G" % gold
-	new_game_button.visible = quest_step >= 2
-	if battle_player_status != null:
-		battle_player_status.text = "YOU  ·  LV %d  ·  HP %d/%d  ·  MP %d/%d" % [
-			player_level, player_hp, max_hp(), player_mp, max_mp()
-		]
-
-func _update_battle_hud() -> void:
-	enemy_hp_bar.value = float(enemy_hp) / ENEMY_MAX_HP * 100.0
-	potion_button.text = "Potion (%d)" % potions
-	potion_button.disabled = potions <= 0 or player_hp >= max_hp()
-	magic_button.disabled = player_mp < 8
-	magic_button.text = "Magic (%d MP)" % 8 if player_mp >= 8 else "Magic (need MP)"
+	new_game_button.visible = quest_step >= 5
 
 func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -802,7 +763,10 @@ func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 		"player_mp": player_mp,
 		"player_level": player_level,
 		"player_experience": player_experience,
-		"potions": potions
+		"potions": potions,
+		"salve_collected": salve_collected,
+		"cache_opened": cache_opened,
+		"waystone_discovered": waystone_discovered
 	}))
 	var write_error := file.get_error()
 	file.close()
@@ -837,14 +801,26 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	):
 		push_error("Greenvale save is missing valid progression values.")
 		return false
+	if int(save_version) >= 4 and (
+		typeof(parsed.get("salve_collected")) != TYPE_BOOL \
+		or typeof(parsed.get("cache_opened")) != TYPE_BOOL \
+		or typeof(parsed.get("waystone_discovered")) != TYPE_BOOL
+	):
+		push_error("Greenvale save is missing valid exploration values.")
+		return false
 
-	quest_step = clampi(int(parsed["quest_step"]), 0, 2)
+	quest_step = clampi(int(parsed["quest_step"]), 0, 5)
+	if int(save_version) < 3 and quest_step == 2:
+		quest_step = 3
 	gold = maxi(int(parsed["gold"]), 0)
 	player_level = clampi(int(parsed.get("player_level", 1)), 1, 99)
 	player_experience = maxi(int(parsed.get("player_experience", 0)), 0)
 	player_hp = clampi(int(parsed["player_hp"]), 1, max_hp())
 	player_mp = clampi(int(parsed.get("player_mp", STARTING_MP)), 0, max_mp())
 	potions = clampi(int(parsed["potions"]), 0, 99)
+	salve_collected = bool(parsed.get("salve_collected", false))
+	cache_opened = bool(parsed.get("cache_opened", false))
+	waystone_discovered = bool(parsed.get("waystone_discovered", false))
 	return true
 
 func experience_to_next_level() -> int:
@@ -886,13 +862,17 @@ func _start_fresh_game() -> void:
 	player_mp = max_mp()
 	potions = 0
 	gold = 0
+	salve_collected = false
+	cache_opened = false
+	waystone_discovered = false
 	encounter_started = false
 	battle_active = false
-	battle_won = false
-	battle_fled = false
 	dialogue_active = false
 	dialogue_panel.hide()
-	battle_overlay.hide()
+	if battle_instance != null:
+		battle_instance.queue_free()
+		battle_instance = null
+	_sync_exploration_markers()
 	player.position = Vector2(250, 448)
 	var save_error := save_progress(progress_save_path)
 	if save_error != OK:

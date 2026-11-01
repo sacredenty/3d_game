@@ -7,6 +7,12 @@
 
 Build a turn-based JRPG with FF6-inspired world exploration mechanics using Godot 4. Focus on overworld navigation, dungeon crawling, and party management for solo development scope.
 
+### Current Prototype Milestone
+
+The current playable prototype covers a village/forest adventure with two connected quests, two distinct enemy encounters, reusable turn-based battles with enemy intent and elemental/physical weaknesses, optional potion/gold/XP discoveries, a healing campfire, NPC dialogue, and saved progression. This is a vertical-slice milestone, not completion of the broader phases below.
+
+**Recommended next step:** playtest the slice and tune encounter/reward pacing. Then add a compact optional cave with a new enemy behavior and a meaningful treasure reward before expanding the party roster.
+
 ---
 
 ## Core Design Decisions
