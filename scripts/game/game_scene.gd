@@ -130,6 +130,11 @@ var shop_layer: CanvasLayer
 var shop_status: Label
 var shop_catalog_list: VBoxContainer
 var shop_inventory_list: VBoxContainer
+var inventory_layer: CanvasLayer
+var inventory_title: Label
+var inventory_status: Label
+var inventory_slots_list: VBoxContainer
+var inventory_bag_list: VBoxContainer
 
 func _ready() -> void:
 	save_slot_prefix = progress_save_path.get_basename()
@@ -583,7 +588,7 @@ func _build_interface() -> void:
 	experience_bar.custom_minimum_size = Vector2(230, 14)
 	progression.add_child(experience_bar)
 
-	var controls := _make_panel(screen, Rect2(744, 18, 212, 150))
+	var controls := _make_panel(screen, Rect2(630, 18, 330, 150))
 	var controls_content := VBoxContainer.new()
 	controls_content.add_theme_constant_override("separation", 6)
 	controls.add_child(controls_content)
@@ -592,6 +597,10 @@ func _build_interface() -> void:
 	var save_controls := HBoxContainer.new()
 	save_controls.add_theme_constant_override("separation", 6)
 	controls_content.add_child(save_controls)
+	var inventory_button := _make_button("Bag")
+	inventory_button.custom_minimum_size = Vector2(68, 34)
+	inventory_button.pressed.connect(_open_inventory)
+	save_controls.add_child(inventory_button)
 	var save_menu_button := _make_button("Save / Load")
 	save_menu_button.custom_minimum_size = Vector2(94, 34)
 	save_menu_button.pressed.connect(_open_save_load_ui)
@@ -626,6 +635,7 @@ func _build_interface() -> void:
 	_build_hero_creation()
 	_build_save_load_ui(screen)
 	_build_shop_ui(screen)
+	_build_inventory_ui(screen)
 	_update_hud()
 
 func _build_hero_creation() -> void:
@@ -814,7 +824,7 @@ func _save_slot_path(slot_index: int) -> String:
 	return "%s_slot_%d.json" % [save_slot_prefix, slot_index + 1]
 
 func _open_save_load_ui() -> void:
-	if creation_layer.visible or shop_layer.visible or battle_active or dialogue_active:
+	if creation_layer.visible or shop_layer.visible or inventory_layer.visible or battle_active or dialogue_active:
 		return
 	player.set("movement_enabled", false)
 	_update_save_slot_rows()
@@ -822,7 +832,7 @@ func _open_save_load_ui() -> void:
 
 func _close_save_load_ui() -> void:
 	save_load_layer.hide()
-	if not creation_layer.visible and not battle_active:
+	if not creation_layer.visible and not battle_active and not inventory_layer.visible and not shop_layer.visible:
 		player.set("movement_enabled", true)
 
 func _update_save_slot_rows() -> void:
@@ -915,6 +925,40 @@ func _build_shop_ui(screen: Control) -> void:
 	content.add_child(close_button)
 	shop_layer.hide()
 
+func _build_inventory_ui(screen: Control) -> void:
+	inventory_layer = CanvasLayer.new()
+	inventory_layer.layer = 17
+	add_child(inventory_layer)
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	inventory_layer.add_child(overlay)
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.03, 0.06, 0.08, 0.84)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(backdrop)
+	var panel := _make_panel(overlay, Rect2(48, 28, 864, 544))
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+	inventory_title = _make_label("", 22, Color("f4e3b8"))
+	inventory_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(inventory_title)
+	inventory_status = _make_label("Gold: %d G  ·  Sell items to Rowan; drop unused gear here." % gold, 14, Color("f3d890"))
+	inventory_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(inventory_status)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 16)
+	content.add_child(columns)
+	inventory_slots_list = _make_shop_list(columns, "Equipment Slots")
+	inventory_bag_list = _make_shop_list(columns, "Bag Contents")
+	var close_button := _make_button("Close Bag")
+	close_button.custom_minimum_size = Vector2(220, 38)
+	close_button.pressed.connect(_close_inventory)
+	content.add_child(close_button)
+	inventory_layer.hide()
+
 func _make_shop_list(parent: HBoxContainer, title: String) -> VBoxContainer:
 	var section := VBoxContainer.new()
 	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -930,6 +974,165 @@ func _make_shop_list(parent: HBoxContainer, title: String) -> VBoxContainer:
 	item_list.add_theme_constant_override("separation", 6)
 	scroll.add_child(item_list)
 	return item_list
+
+func _open_inventory() -> void:
+	if creation_layer.visible or save_load_layer.visible or shop_layer.visible \
+		or battle_active or dialogue_active:
+		return
+	player.set("movement_enabled", false)
+	inventory_title.text = "%s  ·  CHARACTER & BAG" % hero_name
+	inventory_status.text = "Gold: %d G  ·  Sell at Rowan, or drop items from your bag." % gold
+	_refresh_inventory_ui()
+	inventory_layer.show()
+
+func _close_inventory() -> void:
+	inventory_layer.hide()
+	if not creation_layer.visible and not battle_active \
+		and not save_load_layer.visible and not shop_layer.visible:
+		player.set("movement_enabled", true)
+
+func _refresh_inventory_ui() -> void:
+	_clear_list(inventory_slots_list)
+	_clear_list(inventory_bag_list)
+	for slot in EQUIPMENT_SLOTS:
+		var item_name: String = equipped_slots[slot]
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 2)
+		inventory_slots_list.add_child(row)
+		var details := _make_label("%s: %s\n%s" % [
+			EQUIPMENT_SLOT_LABELS[slot],
+			item_name if not item_name.is_empty() else "Empty",
+			_describe_equipment(item_name) if not item_name.is_empty() else "No item equipped."
+		], 13, Color("e8eddb"))
+		details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(details)
+		if not item_name.is_empty():
+			var unequip_button := _make_button("Unequip")
+			unequip_button.custom_minimum_size = Vector2(92, 32)
+			unequip_button.pressed.connect(_unequip_slot.bind(slot))
+			row.add_child(unequip_button)
+
+	if potions > 0:
+		var potion_row := HBoxContainer.new()
+		inventory_bag_list.add_child(potion_row)
+		var potion_details := _make_label("Potion ×%d\nRestores HP during battle." % potions, 13, Color("e8eddb"))
+		potion_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		potion_row.add_child(potion_details)
+		var sell_potion := _make_button("Sell 10 G")
+		sell_potion.custom_minimum_size = Vector2(92, 32)
+		sell_potion.disabled = not _near_merchant()
+		sell_potion.pressed.connect(_sell_shop_item.bind("Potion"))
+		potion_row.add_child(sell_potion)
+		var drop_potion := _make_button("Drop 1")
+		drop_potion.custom_minimum_size = Vector2(76, 32)
+		drop_potion.pressed.connect(_drop_item.bind("Potion"))
+		potion_row.add_child(drop_potion)
+
+	var listed_items: Dictionary = {}
+	for item_name in equipment_inventory:
+		if listed_items.has(item_name):
+			continue
+		listed_items[item_name] = true
+		var item: Dictionary = ITEM_CATALOG[item_name]
+		var slot: String = item["type"]
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 2)
+		inventory_bag_list.add_child(row)
+		var details := _make_label("%s  ·  %s ×%d%s\n%s\n%s" % [
+			EQUIPMENT_SLOT_LABELS[slot], item_name, equipment_inventory.count(item_name),
+			"  (Equipped)" if equipped_slots[slot] == item_name else "",
+			item["description"], _compare_equipment(item_name)
+		], 13, Color("e8eddb"))
+		details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(details)
+		var buttons := HBoxContainer.new()
+		row.add_child(buttons)
+		if equipped_slots[slot] != item_name:
+			var equip_button := _make_button("Equip")
+			equip_button.custom_minimum_size = Vector2(78, 32)
+			equip_button.pressed.connect(_equip_item.bind(item_name))
+			buttons.add_child(equip_button)
+		var sell_button := _make_button("Sell %d G" % item["sell_price"])
+		sell_button.custom_minimum_size = Vector2(96, 32)
+		sell_button.disabled = not _near_merchant() or not _can_sell_equipment(item_name)
+		sell_button.pressed.connect(_sell_shop_item.bind(item_name))
+		buttons.add_child(sell_button)
+		var drop_button := _make_button("Drop 1")
+		drop_button.custom_minimum_size = Vector2(76, 32)
+		drop_button.disabled = not _can_drop_equipment(item_name)
+		drop_button.pressed.connect(_drop_item.bind(item_name))
+		buttons.add_child(drop_button)
+
+func _clear_list(item_list: VBoxContainer) -> void:
+	for child in item_list.get_children():
+		item_list.remove_child(child)
+		child.queue_free()
+
+func _near_merchant() -> bool:
+	return player.global_position.distance_to(merchant.global_position) < 76.0
+
+func _describe_equipment(item_name: String) -> String:
+	var item: Dictionary = ITEM_CATALOG[item_name]
+	return "%s   Physical +%d   Ember +%d   Defense +%d" % [
+		item["description"], item["attack"], item["magic"], item["defense"]
+	]
+
+func _compare_equipment(item_name: String) -> String:
+	var item: Dictionary = ITEM_CATALOG[item_name]
+	var slot: String = item["type"]
+	var current_name: String = equipped_slots[slot]
+	var current: Dictionary = ITEM_CATALOG[current_name] if not current_name.is_empty() else {}
+	return "Compared with %s: Phys %+d  Ember %+d  Def %+d" % [
+		current_name if not current_name.is_empty() else "Empty",
+		int(item["attack"]) - int(current.get("attack", 0)),
+		int(item["magic"]) - int(current.get("magic", 0)),
+		int(item["defense"]) - int(current.get("defense", 0))
+	]
+
+func _can_sell_equipment(item_name: String) -> bool:
+	if not ITEM_CATALOG.has(item_name):
+		return false
+	var slot: String = ITEM_CATALOG[item_name]["type"]
+	return equipment_inventory.count(item_name) > int(equipped_slots[slot] == item_name) \
+		and int(ITEM_CATALOG[item_name]["sell_price"]) > 0
+
+func _can_drop_equipment(item_name: String) -> bool:
+	if not ITEM_CATALOG.has(item_name):
+		return false
+	var slot: String = ITEM_CATALOG[item_name]["type"]
+	return equipment_inventory.count(item_name) > int(equipped_slots[slot] == item_name)
+
+func _unequip_slot(slot: String) -> void:
+	if not EQUIPMENT_SLOTS.has(slot) or str(equipped_slots.get(slot, "")).is_empty():
+		return
+	equipped_slots[slot] = ""
+	inventory_status.text = "Unequipped %s." % EQUIPMENT_SLOT_LABELS[slot]
+	_persist_inventory_change()
+
+func _drop_item(item_name: String) -> void:
+	if item_name == "Potion":
+		if potions <= 0:
+			return
+		potions -= 1
+	else:
+		if not _can_drop_equipment(item_name):
+			return
+		equipment_inventory.erase(item_name)
+	inventory_status.text = "Dropped one %s." % item_name
+	_persist_inventory_change()
+
+func _persist_inventory_change() -> void:
+	var save_error := save_progress(progress_save_path)
+	if save_error != OK:
+		push_error("Could not save inventory change: %s" % error_string(save_error))
+		inventory_status.text = "Inventory changed, but progress could not be saved."
+	else:
+		inventory_status.text = "%s  ·  Gold: %d G" % [inventory_status.text, gold]
+	_update_hud()
+	if inventory_layer.visible:
+		_refresh_inventory_ui()
+	if shop_layer.visible:
+		_refresh_shop_ui()
 
 func _open_shop() -> void:
 	if creation_layer.visible or save_load_layer.visible or battle_active or dialogue_active \
@@ -977,6 +1180,10 @@ func _refresh_shop_ui() -> void:
 		sell_potion.custom_minimum_size = Vector2(100, 36)
 		sell_potion.pressed.connect(_sell_shop_item.bind("Potion"))
 		potion_row.add_child(sell_potion)
+		var drop_potion := _make_button("Drop 1")
+		drop_potion.custom_minimum_size = Vector2(76, 36)
+		drop_potion.pressed.connect(_drop_item.bind("Potion"))
+		potion_row.add_child(drop_potion)
 
 	var listed_equipment: Dictionary = {}
 	for item_name in equipment_inventory:
@@ -1007,6 +1214,11 @@ func _refresh_shop_ui() -> void:
 		sell_button.disabled = owned_count <= equipped_count or int(item["sell_price"]) <= 0
 		sell_button.pressed.connect(_sell_shop_item.bind(item_name))
 		row.add_child(sell_button)
+		var drop_button := _make_button("Drop 1")
+		drop_button.custom_minimum_size = Vector2(76, 36)
+		drop_button.disabled = not _can_drop_equipment(item_name)
+		drop_button.pressed.connect(_drop_item.bind(item_name))
+		row.add_child(drop_button)
 
 func _buy_shop_item(item_name: String) -> void:
 	if not SHOP_ITEMS.has(item_name):
@@ -1032,6 +1244,10 @@ func _buy_shop_item(item_name: String) -> void:
 	_persist_shop_transaction()
 
 func _sell_shop_item(item_name: String) -> void:
+	if not _near_merchant():
+		if inventory_layer.visible:
+			inventory_status.text = "Visit Rowan to sell items."
+		return
 	if item_name == "Potion":
 		if potions <= 0:
 			return
@@ -1066,10 +1282,16 @@ func _persist_shop_transaction() -> void:
 		shop_status.text = "Transaction complete, but progress could not be saved."
 		_update_hud()
 		_refresh_shop_ui()
+		if inventory_layer.visible:
+			inventory_status.text = "Gold: %d G" % gold
+			_refresh_inventory_ui()
 		return
 	shop_status.text = "%s  ·  Gold: %d G" % [shop_status.text, gold]
 	_update_hud()
 	_refresh_shop_ui()
+	if inventory_layer.visible:
+		inventory_status.text = "Gold: %d G" % gold
+		_refresh_inventory_ui()
 
 func _load_slot(slot_index: int) -> void:
 	if slot_index < 0 or slot_index >= SAVE_SLOT_COUNT:
@@ -1160,7 +1382,11 @@ func _process(_delta: float) -> void:
 		_start_battle("guardian")
 
 func _unhandled_input(event: InputEvent) -> void:
-	if creation_layer.visible or save_load_layer.visible or shop_layer.visible:
+	if creation_layer.visible or save_load_layer.visible or shop_layer.visible or inventory_layer.visible:
+		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_I:
+		_open_inventory()
+		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("interact") and not event.is_echo() and not battle_active:
 		if dialogue_active:
@@ -1174,7 +1400,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _update_prompt() -> void:
-	if battle_active or dialogue_active or shop_layer.visible:
+	if battle_active or dialogue_active or shop_layer.visible or inventory_layer.visible:
 		prompt_panel.hide()
 		return
 	if player.global_position.distance_to(npc.global_position) < 76.0:
@@ -1680,7 +1906,8 @@ func _default_equipped_slots() -> Dictionary:
 	}
 
 func _confirm_new_game() -> void:
-	if creation_layer.visible or save_load_layer.visible or shop_layer.visible or battle_active or dialogue_active:
+	if creation_layer.visible or save_load_layer.visible or shop_layer.visible \
+		or inventory_layer.visible or battle_active or dialogue_active:
 		return
 	new_game_dialog.popup_centered()
 
