@@ -2,45 +2,26 @@
 
 A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world exploration mechanics.
 
-## Features Implemented (Phase 1-3)
+## Current Playable Slice
 
-### Core Systems ✅
-- Character class with HP, MP, ATK, DEF stats
-- Equipment slots (weapon, armor, accessory)
-- Party management for 4 characters
-- Turn-based combat engine
-- Save/load system using JSON serialization
-
-### Overworld Exploration ✅
-- Tile-based navigation system
-- Zone transitions (village, forest, cave, castle)
-- Random encounter system (15% chance per step)
-- Enemy AI with attack patterns and elemental effects
-
-### Dungeon Generation ✅
-- Procedural room layout algorithm
-- Room types: combat, treasure, boss, exit
-- Corridor-based navigation
-- Boss encounters
+- Explore a tile-based village and forest clearing with solid world boundaries, trees, and buildings
+- Talk to Mira, follow the quest objective, and fight a shade with attack, guard, and potion actions
+- Earn gold for completing the quest; progress saves between sessions
+- Terrain and character pixel art are generated at runtime as placeholders until source art is added
 
 ## How to Run
 
 1. Open Godot 4 in this directory
-2. Select `res://scenes/main/main_scene.tscn` as the main scene
+2. Run the default `res://scenes/game.tscn` scene
 3. Press F5 or run from the Play button
 
 ## Controls
 
-### Overworld Movement
-- **WASD** or **Arrow Keys**: Move player
-- Random encounters trigger automatically when moving
-
-### Combat (Keyboard)
-- **A / 1**: Attack
-- **Z / 2**: Magic
-- **I / 3**: Item
-- **G / 4**: Guard
-- **Q / ESC**: Flee
+### Greenvale Adventure
+- **WASD** or **Arrow Keys**: Move
+- **E**: Talk to Mira / continue dialogue
+- **Attack**, **Guard**, and **Potion**: Battle actions shown on screen
+- Progress saves after completing the forest quest; use **New Game** on the HUD to reset it
 
 ## Project Structure
 
@@ -57,6 +38,7 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 │   ├── overworld/      # Overworld map
 │   └── dungeons/       # Dungeon exploration
 ├── scripts/
+│   ├── game/           # Greenvale playable slice and generated pixel art
 │   ├── core/           # Base classes (Character, Equipment)
 │   ├── systems/        # Game systems (Combat, Save, etc.)
 │   │   ├── combat/     # Combat engine
@@ -81,7 +63,7 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 - Turn order calculated by `(ATK / DEF) * 100`
 - Elemental system: Fire, Ice, Lightning, Wind, Earth, Water
 - Status effects: Burn, Freeze, Shock, Poison, Sleep
-- Save data stored in `user://savegame.json`
+- Greenvale progress stored in `user://greenvale_progress.json`
 
 ## Default Party
 
@@ -94,6 +76,5 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 
 ## Known Issues
 
-- Combat UI needs visual implementation (currently text-only)
-- Overworld map rendering uses placeholder tiles
-- Dungeon scene needs tilemap integration
+- Greenvale's first-pass pixel art is generated in code; replace it with a hand-authored tileset and animations as art is added
+- The legacy dungeon and broader RPG systems are still prototypes and are not part of the current playable loop

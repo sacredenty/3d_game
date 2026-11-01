@@ -6,12 +6,18 @@ func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
+	var save_path := "user://gameplay_smoke_save.json"
 	var game: Node = load("res://scenes/game.tscn").instantiate()
+	game.set("progress_save_path", save_path)
 	root.add_child(game)
 	await process_frame
 
 	var player: CharacterBody2D = game.get("player")
 	_check(game.get("quest_step") == 0, "New game should start with the village objective")
+	var ground: TileMapLayer = game.get("world_tiles")
+	_check(ground.get_used_cells().size() == 1500, "The overworld should use the complete tile atlas")
+	_check(player.get_node("CharacterSprite").texture.get_size() == Vector2(24, 32), "Player should use pixel-art sprite frames")
+	_check(game.get("npc").get_node("CharacterSprite").texture.get_size() == Vector2(24, 32), "NPC should use pixel art")
 	var starting_x: float = player.global_position.x
 	Input.action_press("move_right")
 	for frame in range(20):
@@ -32,7 +38,9 @@ func _run() -> void:
 	game.call("_advance_dialogue")
 	_check(not game.get("dialogue_active"), "Dialogue should close after its final line")
 
-	game.call("_start_battle")
+	player.global_position = Vector2(1330, 448)
+	game.call("_process", 0.0)
+	_check(game.get("battle_active"), "Entering the clearing should start the encounter")
 	var attack_button: Button
 	for button in game.find_children("*", "Button", true, false):
 		if button.text == "Attack":
@@ -66,9 +74,40 @@ func _run() -> void:
 	_check(game.get("quest_step") == 2, "Victory should complete the quest")
 	_check(game.get("gold") == 75, "Victory should award the promised gold")
 	_check(not game.get("battle_active"), "The world should resume after the battle")
+	var saved_hp: int = game.get("player_hp")
 
 	game.queue_free()
 	await process_frame
+	var resumed_game: Node = load("res://scenes/game.tscn").instantiate()
+	resumed_game.set("progress_save_path", save_path)
+	root.add_child(resumed_game)
+	await process_frame
+	_check(resumed_game.get("quest_step") == 2, "Completed quest should persist after restarting")
+	_check(resumed_game.get("gold") == 75, "Gold should persist after restarting")
+	_check(resumed_game.get("player_hp") == saved_hp, "HP should persist after restarting")
+	_check(resumed_game.get("potions") == 0, "Potion count should persist after restarting")
+	_check(resumed_game.get("new_game_button").visible, "Completed save should offer a new game")
+	resumed_game.call("_confirm_new_game")
+	_check(resumed_game.get("new_game_dialog").visible, "Starting a new game should request confirmation")
+	resumed_game.get("new_game_dialog").confirmed.emit()
+	_check(resumed_game.get("quest_step") == 0, "Confirmed new game should reset quest progress")
+	_check(resumed_game.get("gold") == 0, "Confirmed new game should reset gold")
+	_check(resumed_game.get("player_hp") == 100, "Confirmed new game should restore starting HP")
+	_check(resumed_game.get("potions") == 0, "Confirmed new game should reset potions")
+	resumed_game.queue_free()
+	await process_frame
+	var fresh_game: Node = load("res://scenes/game.tscn").instantiate()
+	fresh_game.set("progress_save_path", save_path)
+	root.add_child(fresh_game)
+	await process_frame
+	_check(fresh_game.get("quest_step") == 0, "New game state should persist after restarting")
+	_check(fresh_game.get("gold") == 0, "Reset gold should persist after restarting")
+	fresh_game.queue_free()
+	await process_frame
+	var absolute_save_path := ProjectSettings.globalize_path(save_path)
+	if FileAccess.file_exists(save_path):
+		var remove_error := DirAccess.remove_absolute(absolute_save_path)
+		_check(remove_error == OK, "Test save file should be removed")
 	quit(failures)
 
 func _check(condition: bool, message: String) -> void:

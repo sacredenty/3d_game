@@ -8,10 +8,14 @@ const FOREST_GATE := 720.0
 const CLEARING_POSITION := Vector2(1330.0, 448.0)
 const PLAYER_MAX_HP := 100
 const ENEMY_MAX_HP := 82
+const PROGRESS_SAVE_PATH := "user://greenvale_progress.json"
+const SAVE_VERSION := 1
 
 var player: CharacterBody2D
 var npc: StaticBody2D
+var world_tiles: TileMapLayer
 var tree_positions: Array[Vector2] = []
+var tree_texture: Texture2D
 var quest_step: int = 0
 var dialogue_lines: Array[String] = []
 var dialogue_index: int = 0
@@ -24,6 +28,7 @@ var enemy_hp: int = ENEMY_MAX_HP
 var potions: int = 1
 var gold: int = 0
 var guarding: bool = false
+var progress_save_path: String = PROGRESS_SAVE_PATH
 
 var hud_layer: CanvasLayer
 var objective_label: Label
@@ -39,77 +44,27 @@ var enemy_hp_bar: ProgressBar
 var battle_log: Label
 var potion_button: Button
 var battle_result_button: Button
+var new_game_button: Button
+var new_game_dialog: ConfirmationDialog
 
 func _ready() -> void:
 	_build_world()
 	_build_player()
 	_build_npc()
 	_build_interface()
-	queue_redraw()
-
-func _draw() -> void:
-	for y in range(int(WORLD_SIZE.y / TILE_SIZE)):
-		for x in range(int(WORLD_SIZE.x / TILE_SIZE)):
-			var tile_x := x * TILE_SIZE
-			var tile_y := y * TILE_SIZE
-			var forest := tile_x >= VILLAGE_EDGE
-			var color := Color("70985b") if not forest else Color("476f48")
-			var variation := float((x * 19 + y * 31) % 7) * 0.008
-			color = color.lightened(variation) if (x + y) % 2 == 0 else color.darkened(variation)
-			draw_rect(Rect2(tile_x, tile_y, TILE_SIZE, TILE_SIZE), color)
-			draw_rect(Rect2(tile_x, tile_y, TILE_SIZE, TILE_SIZE), Color(0.08, 0.13, 0.08, 0.08), false)
-
-	_draw_path()
-	_draw_houses()
-	_draw_trees()
-	_draw_landmarks()
-
-func _draw_path() -> void:
-	draw_rect(Rect2(0, 400, 1120, 112), Color("b99a69"))
-	draw_rect(Rect2(0, 400, 1120, 8), Color("d0b782"))
-	draw_rect(Rect2(0, 504, 1120, 8), Color("92764f"))
-	draw_rect(Rect2(1072, 400, 112, 220), Color("b99a69"))
-	draw_rect(Rect2(1072, 400, 112, 8), Color("d0b782"))
-	draw_circle(CLEARING_POSITION, 132.0, Color("81925a"))
-	draw_circle(CLEARING_POSITION, 112.0, Color("b99a69"))
-	draw_circle(CLEARING_POSITION, 104.0, Color("c2a676"))
-
-func _draw_houses() -> void:
-	_draw_house(Rect2(96, 176, 176, 144), Color("d6bd8b"), Color("754b43"))
-	_draw_house(Rect2(384, 208, 144, 112), Color("c8b17c"), Color("596b55"))
-	draw_rect(Rect2(305, 344, 74, 54), Color("a99163"))
-	draw_rect(Rect2(314, 351, 56, 47), Color("705448"))
-
-func _draw_house(bounds: Rect2, wall_color: Color, roof_color: Color) -> void:
-	draw_rect(bounds, wall_color)
-	var roof := PackedVector2Array([
-		Vector2(bounds.position.x - 18, bounds.position.y + 12),
-		Vector2(bounds.position.x + bounds.size.x * 0.5, bounds.position.y - 58),
-		Vector2(bounds.end.x + 18, bounds.position.y + 12)
-	])
-	draw_colored_polygon(roof, roof_color)
-	draw_rect(Rect2(bounds.position.x + 20, bounds.end.y - 62, 42, 62), Color("59443a"))
-	draw_rect(Rect2(bounds.end.x - 58, bounds.position.y + 38, 34, 34), Color("9bc3bd"))
-
-func _draw_trees() -> void:
-	for tree_position in tree_positions:
-		draw_circle(tree_position + Vector2(5, 12), 25.0, Color(0.08, 0.15, 0.08, 0.24))
-		draw_rect(Rect2(tree_position.x - 6, tree_position.y + 6, 12, 24), Color("684c38"))
-		draw_circle(tree_position + Vector2(0, -6), 24.0, Color("315b3b"))
-		draw_circle(tree_position + Vector2(-12, 1), 15.0, Color("3c7045"))
-		draw_circle(tree_position + Vector2(12, 2), 15.0, Color("3b6b42"))
-		draw_circle(tree_position + Vector2(-5, -12), 10.0, Color("527d4d"))
-
-func _draw_landmarks() -> void:
-	draw_circle(CLEARING_POSITION, 52.0, Color(0.9, 0.79, 0.49, 0.12))
-	draw_circle(Vector2(1330, 448), 9.0, Color("d5bd79"))
-	draw_circle(Vector2(1330, 448), 4.0, Color("fff0b5"))
-	draw_rect(Rect2(594, 386, 14, 132), Color("70543a"))
-	draw_rect(Rect2(616, 386, 14, 132), Color("70543a"))
-	draw_rect(Rect2(594, 396, 36, 12), Color("9a7548"))
-	draw_rect(Rect2(594, 496, 36, 12), Color("9a7548"))
+	load_progress(progress_save_path)
+	_update_hud()
 
 func _build_world() -> void:
+	y_sort_enabled = true
+	world_tiles = TileMapLayer.new()
+	world_tiles.name = "Ground"
+	world_tiles.z_index = -1
+	world_tiles.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	world_tiles.tile_set = _make_world_tileset()
+	add_child(world_tiles)
+	_paint_world()
+
 	tree_positions.clear()
 	_add_rect_obstacle(Vector2(-18, WORLD_SIZE.y * 0.5), Vector2(36, WORLD_SIZE.y + 72))
 	_add_rect_obstacle(Vector2(WORLD_SIZE.x + 18, WORLD_SIZE.y * 0.5), Vector2(36, WORLD_SIZE.y + 72))
@@ -123,11 +78,13 @@ func _build_world() -> void:
 			if x < VILLAGE_EDGE and (x + y) % 3 != 0:
 				continue
 			tree_positions.append(position)
-			_add_circle_obstacle(position + Vector2(0, 15), 13.0)
+			_add_tree(position)
 
 	_add_rect_obstacle(Vector2(184, 250), Vector2(150, 100))
 	_add_rect_obstacle(Vector2(456, 258), Vector2(130, 80))
 	_add_rect_obstacle(Vector2(342, 370), Vector2(68, 42))
+	_add_house(Vector2(184, 250), Color("a54f42"), Color("d6bd8b"))
+	_add_house(Vector2(456, 258), Color("596b55"), Color("c8b17c"))
 
 func _is_path_position(position: Vector2) -> bool:
 	if position.x < 1140.0 and position.y > 368.0 and position.y < 544.0:
@@ -159,6 +116,175 @@ func _add_circle_obstacle(position: Vector2, radius: float) -> void:
 	body.add_child(collision)
 	add_child(body)
 
+func _make_world_tileset() -> TileSet:
+	var atlas_image := Image.create(128, 64, false, Image.FORMAT_RGBA8)
+	atlas_image.fill(Color.TRANSPARENT)
+	for row in range(2):
+		for column in range(4):
+			_draw_ground_tile(atlas_image, Vector2i(column * TILE_SIZE, row * TILE_SIZE), column, row)
+	var atlas_texture := ImageTexture.create_from_image(atlas_image)
+	var atlas_source := TileSetAtlasSource.new()
+	atlas_source.texture = atlas_texture
+	atlas_source.texture_region_size = Vector2i(TILE_SIZE, TILE_SIZE)
+	for y in range(2):
+		for x in range(4):
+			atlas_source.create_tile(Vector2i(x, y))
+	var tile_set := TileSet.new()
+	tile_set.tile_size = Vector2i(TILE_SIZE, TILE_SIZE)
+	tile_set.add_source(atlas_source, 0)
+	return tile_set
+
+func _draw_ground_tile(image: Image, origin: Vector2i, column: int, row: int) -> void:
+	var base_colors: Array[Color] = [
+		Color("81995a"), Color("536f49"), Color("849c5b"), Color("bca071"),
+		Color("a98b60"), Color("77745b"), Color("758652"), Color("455f45")
+	]
+	var tile_index := row * 4 + column
+	var base := base_colors[tile_index]
+	image.fill_rect(Rect2i(origin, Vector2i(TILE_SIZE, TILE_SIZE)), base)
+	var shade := base.darkened(0.13)
+	var light := base.lightened(0.12)
+	for pixel in range(0, TILE_SIZE, 8):
+		image.fill_rect(Rect2i(origin + Vector2i(pixel, 0), Vector2i(1, TILE_SIZE)), shade)
+		image.fill_rect(Rect2i(origin + Vector2i(0, pixel), Vector2i(TILE_SIZE, 1)), shade)
+	match tile_index:
+		0, 1, 6, 7:
+			image.fill_rect(Rect2i(origin + Vector2i(6, 7), Vector2i(3, 2)), light)
+			image.fill_rect(Rect2i(origin + Vector2i(21, 20), Vector2i(2, 3)), shade)
+			image.fill_rect(Rect2i(origin + Vector2i(13, 26), Vector2i(2, 2)), light)
+		2:
+			_pixel(image, origin.x + 7, origin.y + 10, 3, 3, Color("f1d27a"))
+			_pixel(image, origin.x + 6, origin.y + 8, 1, 2, Color("456d43"))
+			_pixel(image, origin.x + 21, origin.y + 24, 3, 3, Color("e6a8a0"))
+			_pixel(image, origin.x + 22, origin.y + 22, 1, 2, Color("456d43"))
+		3, 4:
+			image.fill_rect(Rect2i(origin + Vector2i(4, 8), Vector2i(5, 2)), light)
+			image.fill_rect(Rect2i(origin + Vector2i(20, 23), Vector2i(4, 2)), shade)
+			image.fill_rect(Rect2i(origin + Vector2i(14, 14), Vector2i(2, 2)), Color("d1b987"))
+		5:
+			image.fill_rect(Rect2i(origin + Vector2i(3, 5), Vector2i(26, 22)), Color("8b795f"))
+			for seam in range(8, TILE_SIZE, 8):
+				image.fill_rect(Rect2i(origin + Vector2i(seam, 5), Vector2i(1, 22)), Color("685c4b"))
+			image.fill_rect(Rect2i(origin + Vector2i(3, 15), Vector2i(26, 1)), Color("685c4b"))
+
+func _pixel(image: Image, x: int, y: int, width: int, height: int, color: Color) -> void:
+	image.fill_rect(Rect2i(x, y, width, height), color)
+
+func _paint_world() -> void:
+	for y in range(int(WORLD_SIZE.y / TILE_SIZE)):
+		for x in range(int(WORLD_SIZE.x / TILE_SIZE)):
+			var position := Vector2((x + 0.5) * TILE_SIZE, (y + 0.5) * TILE_SIZE)
+			var source := Vector2i(0, 0)
+			if x * TILE_SIZE >= VILLAGE_EDGE:
+				source = Vector2i(1, 0) if (x + y) % 3 != 0 else Vector2i(3, 1)
+			elif (x + y) % 11 == 0:
+				source = Vector2i(2, 0)
+			if x * TILE_SIZE < 1120 and y in range(12, 16):
+				source = Vector2i(3, 0)
+			if x in range(33, 37) and y in range(12, 20):
+				source = Vector2i(3, 0)
+			if position.distance_to(CLEARING_POSITION) < 128.0:
+				source = Vector2i(2, 1) if position.distance_to(CLEARING_POSITION) < 82.0 else Vector2i(3, 0)
+			if _is_building_position(position):
+				source = Vector2i(5, 1)
+			world_tiles.set_cell(Vector2i(x, y), 0, source)
+
+func _add_tree(position: Vector2) -> void:
+	if tree_texture == null:
+		tree_texture = _make_tree_texture()
+	var body := StaticBody2D.new()
+	body.position = position + Vector2(0, 12)
+	body.z_index = 1
+	var shape := CircleShape2D.new()
+	shape.radius = 12.0
+	var collision := CollisionShape2D.new()
+	collision.shape = shape
+	body.add_child(collision)
+	var sprite := Sprite2D.new()
+	sprite.texture = tree_texture
+	sprite.position.y = -24.0
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	body.add_child(sprite)
+	add_child(body)
+
+func _make_tree_texture() -> Texture2D:
+	var image := Image.create(48, 64, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	_pixel(image, 20, 37, 9, 23, Color("63452f"))
+	_pixel(image, 18, 55, 13, 4, Color("4a382c"))
+	_pixel(image, 9, 22, 28, 23, Color("294c37"))
+	_pixel(image, 4, 27, 15, 20, Color("356344"))
+	_pixel(image, 28, 24, 16, 22, Color("3c7049"))
+	_pixel(image, 13, 11, 23, 24, Color("3d754a"))
+	_pixel(image, 18, 5, 14, 15, Color("548250"))
+	_pixel(image, 11, 22, 7, 7, Color("679357"))
+	_pixel(image, 29, 18, 6, 6, Color("6b9657"))
+	_pixel(image, 7, 33, 6, 5, Color("477c4d"))
+	return ImageTexture.create_from_image(image)
+
+func _add_house(position: Vector2, roof_color: Color, wall_color: Color) -> void:
+	var sprite := Sprite2D.new()
+	sprite.texture = _make_house_texture(roof_color, wall_color)
+	sprite.position = position + Vector2(0, -20)
+	sprite.z_index = 1
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(sprite)
+
+func _make_house_texture(roof_color: Color, wall_color: Color) -> Texture2D:
+	var image := Image.create(96, 80, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	_pixel(image, 8, 28, 80, 48, Color("473d34"))
+	_pixel(image, 12, 31, 72, 45, wall_color)
+	_pixel(image, 4, 25, 88, 8, roof_color.darkened(0.28))
+	for row in range(5):
+		var inset := row * 7
+		_pixel(image, 10 + inset, 8 + row * 5, 76 - inset * 2, 7, roof_color)
+		_pixel(image, 10 + inset, 14 + row * 5, 76 - inset * 2, 1, roof_color.lightened(0.15))
+	_pixel(image, 22, 52, 18, 24, Color("644333"))
+	_pixel(image, 24, 54, 14, 22, Color("825a3c"))
+	_pixel(image, 59, 39, 19, 17, Color("527679"))
+	_pixel(image, 58, 38, 21, 2, Color("f0dfb0"))
+	_pixel(image, 67, 38, 2, 18, Color("f0dfb0"))
+	_pixel(image, 12, 74, 72, 3, Color("8e704f"))
+	return ImageTexture.create_from_image(image)
+
+func _make_character_texture(coat: Color, hair: Color, trim: Color) -> Texture2D:
+	var image := Image.create(24, 32, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	_pixel(image, 7, 2, 10, 2, hair.darkened(0.2))
+	_pixel(image, 5, 4, 14, 6, hair)
+	_pixel(image, 7, 10, 10, 7, Color("e7bd91"))
+	_pixel(image, 6, 9, 12, 3, hair)
+	_pixel(image, 8, 13, 2, 2, Color("453932"))
+	_pixel(image, 15, 13, 2, 2, Color("453932"))
+	_pixel(image, 5, 17, 14, 9, coat.darkened(0.18))
+	_pixel(image, 7, 17, 10, 8, coat)
+	_pixel(image, 9, 18, 6, 6, trim)
+	_pixel(image, 3, 19, 4, 7, coat)
+	_pixel(image, 17, 19, 4, 7, coat)
+	_pixel(image, 6, 26, 5, 5, Color("474b5c"))
+	_pixel(image, 13, 26, 5, 5, Color("474b5c"))
+	_pixel(image, 5, 30, 7, 2, Color("433a34"))
+	_pixel(image, 12, 30, 7, 2, Color("433a34"))
+	return ImageTexture.create_from_image(image)
+
+func _make_shade_texture() -> Texture2D:
+	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	image.fill(Color.TRANSPARENT)
+	_pixel(image, 9, 6, 14, 3, Color("303b52"))
+	_pixel(image, 5, 9, 22, 14, Color("485774"))
+	_pixel(image, 8, 6, 16, 3, Color("647b9a"))
+	_pixel(image, 3, 13, 5, 10, Color("485774"))
+	_pixel(image, 24, 11, 5, 12, Color("485774"))
+	_pixel(image, 7, 23, 18, 5, Color("37435d"))
+	_pixel(image, 9, 27, 4, 4, Color("a8a4c7"))
+	_pixel(image, 19, 27, 4, 4, Color("a8a4c7"))
+	_pixel(image, 10, 13, 4, 3, Color("f3d987"))
+	_pixel(image, 19, 13, 4, 3, Color("f3d987"))
+	_pixel(image, 11, 14, 2, 2, Color("fff3bf"))
+	_pixel(image, 20, 14, 2, 2, Color("fff3bf"))
+	return ImageTexture.create_from_image(image)
+
 func _build_player() -> void:
 	player = CharacterBody2D.new()
 	player.name = "Player"
@@ -173,16 +299,13 @@ func _build_player() -> void:
 	collision.shape = shape
 	player.add_child(collision)
 
-	var shadow := ColorRect.new()
-	shadow.position = Vector2(-13, 4)
-	shadow.size = Vector2(26, 10)
-	shadow.color = Color(0.08, 0.12, 0.08, 0.42)
-	player.add_child(shadow)
-	_add_sprite_rect(player, Vector2(-9, -18), Vector2(18, 19), Color("d5b34f"))
-	_add_sprite_rect(player, Vector2(-7, -27), Vector2(14, 13), Color("e6c19a"))
-	_add_sprite_rect(player, Vector2(-8, -29), Vector2(16, 7), Color("574435"))
-	_add_sprite_rect(player, Vector2(-9, -2), Vector2(7, 12), Color("45556a"))
-	_add_sprite_rect(player, Vector2(2, -2), Vector2(7, 12), Color("45556a"))
+	var sprite := Sprite2D.new()
+	sprite.name = "CharacterSprite"
+	sprite.texture = _make_character_texture(Color("b78c45"), Color("594333"), Color("e5cf86"))
+	sprite.position.y = -22.0
+	sprite.scale = Vector2(1.5, 1.5)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	player.add_child(sprite)
 
 	var camera := Camera2D.new()
 	camera.position_smoothing_enabled = true
@@ -198,14 +321,19 @@ func _build_npc() -> void:
 	npc = StaticBody2D.new()
 	npc.name = "Mira"
 	npc.position = Vector2(344, 448)
+	npc.z_index = 2
 	var shape := CircleShape2D.new()
 	shape.radius = 13.0
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	npc.add_child(collision)
-	_add_sprite_rect(npc, Vector2(-9, -17), Vector2(18, 20), Color("5984a3"))
-	_add_sprite_rect(npc, Vector2(-7, -27), Vector2(14, 13), Color("e9c79e"))
-	_add_sprite_rect(npc, Vector2(-8, -29), Vector2(16, 6), Color("493c36"))
+	var sprite := Sprite2D.new()
+	sprite.name = "CharacterSprite"
+	sprite.texture = _make_character_texture(Color("577f91"), Color("5b4038"), Color("d7b06e"))
+	sprite.position.y = -22.0
+	sprite.scale = Vector2(1.5, 1.5)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	npc.add_child(sprite)
 	add_child(npc)
 
 func _add_sprite_rect(parent: Node2D, offset: Vector2, size: Vector2, color: Color) -> void:
@@ -245,6 +373,12 @@ func _build_interface() -> void:
 	stats.add_child(hp_bar)
 	gold_label = _make_label("0 G", 14, Color("f0cf75"))
 	stats.add_child(gold_label)
+	new_game_button = _make_button("New Game")
+	new_game_button.custom_minimum_size = Vector2(96, 28)
+	new_game_button.add_theme_font_size_override("font_size", 12)
+	new_game_button.pressed.connect(_confirm_new_game)
+	new_game_button.hide()
+	stats.add_child(new_game_button)
 
 	var controls := _make_panel(screen, Rect2(720, 18, 258, 76))
 	var controls_label := _make_label("WASD / Arrows  Move\nE  Talk / interact", 14, Color("e8eddb"))
@@ -269,6 +403,12 @@ func _build_interface() -> void:
 	dialogue_panel.hide()
 
 	_build_battle_interface(screen)
+	new_game_dialog = ConfirmationDialog.new()
+	new_game_dialog.title = "Start a new game?"
+	new_game_dialog.dialog_text = "This will replace your saved Greenvale progress."
+	new_game_dialog.ok_button_text = "Start New Game"
+	new_game_dialog.confirmed.connect(_start_fresh_game)
+	screen.add_child(new_game_dialog)
 	_update_hud()
 
 func _build_battle_interface(screen: Control) -> void:
@@ -285,6 +425,12 @@ func _build_battle_interface(screen: Control) -> void:
 	panel.add_child(content)
 	content.add_child(_make_label("A WILD SHADE APPEARS", 20, Color("f3d890")))
 	content.add_child(_make_label("Forest clearing  /  One enemy", 13, Color("c1d0c0")))
+	var enemy_sprite := TextureRect.new()
+	enemy_sprite.texture = _make_shade_texture()
+	enemy_sprite.custom_minimum_size = Vector2(72, 72)
+	enemy_sprite.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	enemy_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	content.add_child(enemy_sprite)
 	enemy_hp_bar = _make_bar(Color("d16c62"))
 	enemy_hp_bar.custom_minimum_size.y = 22
 	content.add_child(enemy_hp_bar)
@@ -496,6 +642,9 @@ func _leave_battle() -> void:
 	if battle_won:
 		quest_step = 2
 		gold += 75
+		var save_error := save_progress(progress_save_path)
+		if save_error != OK:
+			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
 	else:
 		player_hp = PLAYER_MAX_HP
 		encounter_started = false
@@ -528,8 +677,74 @@ func _update_hud() -> void:
 			objective_label.text = "Quest complete: The forest path is safe. Explore Greenvale!"
 	hp_bar.value = float(player_hp) / PLAYER_MAX_HP * 100.0
 	gold_label.text = "%d G" % gold
+	new_game_button.visible = quest_step >= 2
 
 func _update_battle_hud() -> void:
 	enemy_hp_bar.value = float(enemy_hp) / ENEMY_MAX_HP * 100.0
 	potion_button.text = "Potion (%d)" % potions
 	potion_button.disabled = potions <= 0 or player_hp >= PLAYER_MAX_HP
+
+func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return FileAccess.get_open_error()
+	file.store_string(JSON.stringify({
+		"version": SAVE_VERSION,
+		"quest_step": quest_step,
+		"gold": gold,
+		"player_hp": player_hp,
+		"potions": potions
+	}))
+	var write_error := file.get_error()
+	file.close()
+	return write_error
+
+func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
+	if not FileAccess.file_exists(path):
+		return false
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		push_error("Could not open Greenvale save: %s" % error_string(FileAccess.get_open_error()))
+		return false
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not parsed is Dictionary or parsed.get("version") != SAVE_VERSION:
+		push_error("Greenvale save is invalid or uses an unsupported version.")
+		return false
+	if not _is_saved_integer(parsed.get("quest_step")) \
+		or not _is_saved_integer(parsed.get("gold")) \
+		or not _is_saved_integer(parsed.get("player_hp")) \
+		or not _is_saved_integer(parsed.get("potions")):
+		push_error("Greenvale save is missing valid progress values.")
+		return false
+
+	quest_step = clampi(int(parsed["quest_step"]), 0, 2)
+	gold = maxi(int(parsed["gold"]), 0)
+	player_hp = clampi(int(parsed["player_hp"]), 1, PLAYER_MAX_HP)
+	potions = clampi(int(parsed["potions"]), 0, 99)
+	return true
+
+func _is_saved_integer(value: Variant) -> bool:
+	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+		return false
+	return is_finite(float(value)) and floorf(float(value)) == float(value)
+
+func _confirm_new_game() -> void:
+	new_game_dialog.popup_centered()
+
+func _start_fresh_game() -> void:
+	quest_step = 0
+	player_hp = PLAYER_MAX_HP
+	potions = 0
+	gold = 0
+	encounter_started = false
+	battle_active = false
+	battle_won = false
+	dialogue_active = false
+	dialogue_panel.hide()
+	battle_overlay.hide()
+	player.position = Vector2(250, 448)
+	var save_error := save_progress(progress_save_path)
+	if save_error != OK:
+		push_error("Could not save new-game progress: %s" % error_string(save_error))
+	_update_hud()
