@@ -20,8 +20,9 @@ A turn-based JRPG built with Godot 4, inspired by Final Fantasy VI's world explo
 ### Greenvale Adventure
 - **WASD** or **Arrow Keys**: Move
 - **E**: Talk to Mira / continue dialogue
-- **Attack**, **Guard**, and **Potion**: Battle actions shown on screen
-- Progress saves after completing the forest quest; use **New Game** on the HUD to reset it
+- **1-5** (or click): Attack, Ember magic, Guard, Potion, Flee
+- Ember costs 8 MP; shade victories award XP, and leveling up increases HP and MP
+- Quest, combat, and character progress save as you play; use **New Game** on the HUD to reset a completed run
 
 ## Project Structure
 

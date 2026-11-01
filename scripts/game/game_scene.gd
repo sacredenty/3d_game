@@ -7,9 +7,10 @@ const VILLAGE_EDGE := 640.0
 const FOREST_GATE := 720.0
 const CLEARING_POSITION := Vector2(1330.0, 448.0)
 const PLAYER_MAX_HP := 100
-const ENEMY_MAX_HP := 82
+const ENEMY_MAX_HP := 112
 const PROGRESS_SAVE_PATH := "user://greenvale_progress.json"
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
+const STARTING_MP := 30
 
 var player: CharacterBody2D
 var npc: StaticBody2D
@@ -22,8 +23,12 @@ var dialogue_index: int = 0
 var dialogue_active: bool = false
 var battle_active: bool = false
 var battle_won: bool = false
+var battle_fled: bool = false
 var encounter_started: bool = false
 var player_hp: int = PLAYER_MAX_HP
+var player_mp: int = STARTING_MP
+var player_level: int = 1
+var player_experience: int = 0
 var enemy_hp: int = ENEMY_MAX_HP
 var potions: int = 1
 var gold: int = 0
@@ -33,6 +38,9 @@ var progress_save_path: String = PROGRESS_SAVE_PATH
 var hud_layer: CanvasLayer
 var objective_label: Label
 var hp_bar: ProgressBar
+var mp_bar: ProgressBar
+var experience_bar: ProgressBar
+var progression_label: Label
 var gold_label: Label
 var prompt_panel: PanelContainer
 var prompt_label: Label
@@ -40,9 +48,11 @@ var dialogue_panel: PanelContainer
 var dialogue_label: Label
 var dialogue_hint: Label
 var battle_overlay: ColorRect
+var battle_player_status: Label
 var enemy_hp_bar: ProgressBar
 var battle_log: Label
 var potion_button: Button
+var magic_button: Button
 var battle_result_button: Button
 var new_game_button: Button
 var new_game_dialog: ConfirmationDialog
@@ -353,7 +363,7 @@ func _build_interface() -> void:
 	screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(screen)
 
-	var hud := _make_panel(screen, Rect2(18, 18, 430, 124))
+	var hud := _make_panel(screen, Rect2(18, 18, 474, 174))
 	var hud_content := VBoxContainer.new()
 	hud_content.add_theme_constant_override("separation", 6)
 	hud.add_child(hud_content)
@@ -369,19 +379,32 @@ func _build_interface() -> void:
 	var hp_text := _make_label("HP", 14, Color("f4e3b8"))
 	stats.add_child(hp_text)
 	hp_bar = _make_bar(Color("70c17b"))
-	hp_bar.custom_minimum_size = Vector2(170, 18)
+	hp_bar.custom_minimum_size = Vector2(116, 18)
 	stats.add_child(hp_bar)
+	stats.add_child(_make_label("MP", 14, Color("b8d7e8")))
+	mp_bar = _make_bar(Color("6da7d1"))
+	mp_bar.custom_minimum_size = Vector2(84, 18)
+	stats.add_child(mp_bar)
 	gold_label = _make_label("0 G", 14, Color("f0cf75"))
 	stats.add_child(gold_label)
 	new_game_button = _make_button("New Game")
-	new_game_button.custom_minimum_size = Vector2(96, 28)
+	new_game_button.custom_minimum_size = Vector2(74, 28)
 	new_game_button.add_theme_font_size_override("font_size", 12)
 	new_game_button.pressed.connect(_confirm_new_game)
 	new_game_button.hide()
 	stats.add_child(new_game_button)
 
-	var controls := _make_panel(screen, Rect2(720, 18, 258, 76))
-	var controls_label := _make_label("WASD / Arrows  Move\nE  Talk / interact", 14, Color("e8eddb"))
+	var progression := HBoxContainer.new()
+	progression.add_theme_constant_override("separation", 8)
+	hud_content.add_child(progression)
+	progression_label = _make_label("", 13, Color("f3d890"))
+	progression.add_child(progression_label)
+	experience_bar = _make_bar(Color("d4a84e"))
+	experience_bar.custom_minimum_size = Vector2(230, 14)
+	progression.add_child(experience_bar)
+
+	var controls := _make_panel(screen, Rect2(744, 18, 212, 76))
+	var controls_label := _make_label("WASD / Arrows  Move\nE  Talk  ·  1-5 Battle", 14, Color("e8eddb"))
 	controls.add_child(controls_label)
 
 	prompt_panel = _make_panel(screen, Rect2(310, 540, 340, 48))
@@ -389,13 +412,13 @@ func _build_interface() -> void:
 	prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	prompt_panel.add_child(prompt_label)
 
-	dialogue_panel = _make_panel(screen, Rect2(22, 424, 936, 156))
+	dialogue_panel = _make_panel(screen, Rect2(22, 408, 936, 172))
 	var dialogue_content := VBoxContainer.new()
 	dialogue_content.add_theme_constant_override("separation", 8)
 	dialogue_panel.add_child(dialogue_content)
 	dialogue_label = _make_label("", 18, Color("fff0d0"))
 	dialogue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	dialogue_label.custom_minimum_size.y = 76
+	dialogue_label.custom_minimum_size.y = 92
 	dialogue_content.add_child(dialogue_label)
 	dialogue_hint = _make_label("E  Continue", 13, Color("b9d1c0"))
 	dialogue_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -419,18 +442,23 @@ func _build_battle_interface(screen: Control) -> void:
 	screen.add_child(battle_overlay)
 	battle_overlay.hide()
 
-	var panel := _make_panel(battle_overlay, Rect2(245, 112, 470, 380))
+	var panel := _make_panel(battle_overlay, Rect2(160, 76, 640, 448))
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 13)
 	panel.add_child(content)
 	content.add_child(_make_label("A WILD SHADE APPEARS", 20, Color("f3d890")))
-	content.add_child(_make_label("Forest clearing  /  One enemy", 13, Color("c1d0c0")))
+	battle_player_status = _make_label("", 14, Color("c1d0c0"))
+	battle_player_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(battle_player_status)
 	var enemy_sprite := TextureRect.new()
 	enemy_sprite.texture = _make_shade_texture()
 	enemy_sprite.custom_minimum_size = Vector2(72, 72)
 	enemy_sprite.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	enemy_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	content.add_child(enemy_sprite)
+	var enemy_title := _make_label("SHADE  ·  80 XP", 14, Color("d7c8e8"))
+	enemy_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(enemy_title)
 	enemy_hp_bar = _make_bar(Color("d16c62"))
 	enemy_hp_bar.custom_minimum_size.y = 22
 	content.add_child(enemy_hp_bar)
@@ -443,14 +471,25 @@ func _build_battle_interface(screen: Control) -> void:
 	actions.add_theme_constant_override("separation", 8)
 	content.add_child(actions)
 	var attack_button := _make_button("Attack")
+	attack_button.custom_minimum_size.x = 116
 	attack_button.pressed.connect(_attack)
 	actions.add_child(attack_button)
+	magic_button = _make_button("Magic (8 MP)")
+	magic_button.custom_minimum_size.x = 116
+	magic_button.pressed.connect(_cast_magic)
+	actions.add_child(magic_button)
 	var guard_button := _make_button("Guard")
+	guard_button.custom_minimum_size.x = 116
 	guard_button.pressed.connect(_guard)
 	actions.add_child(guard_button)
 	potion_button = _make_button("Potion (1)")
+	potion_button.custom_minimum_size.x = 116
 	potion_button.pressed.connect(_use_potion)
 	actions.add_child(potion_button)
+	var flee_button := _make_button("Flee")
+	flee_button.custom_minimum_size.x = 116
+	flee_button.pressed.connect(_flee)
+	actions.add_child(flee_button)
 
 	battle_result_button = _make_button("Return to the village")
 	battle_result_button.pressed.connect(_leave_battle)
@@ -522,6 +561,22 @@ func _process(_delta: float) -> void:
 		_start_battle()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if battle_active and event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_A, KEY_1:
+				_attack()
+			KEY_M, KEY_2:
+				_cast_magic()
+			KEY_G, KEY_3:
+				_guard()
+			KEY_P, KEY_4:
+				_use_potion()
+			KEY_F, KEY_5, KEY_ESCAPE:
+				_flee()
+			_:
+				return
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("interact") and not event.is_echo() and not battle_active:
 		if dialogue_active:
 			_advance_dialogue()
@@ -550,6 +605,9 @@ func _talk_to_mira() -> void:
 		]
 		quest_step = 1
 		potions = 1
+		var save_error := save_progress(progress_save_path)
+		if save_error != OK:
+			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
 	elif quest_step == 1:
 		dialogue_lines = ["Mira: Follow the dirt path east. The clearing is beyond the old gate."]
 	else:
@@ -576,6 +634,7 @@ func _start_battle() -> void:
 	encounter_started = true
 	battle_active = true
 	battle_won = false
+	battle_fled = false
 	enemy_hp = ENEMY_MAX_HP
 	player.set("movement_enabled", false)
 	battle_log.text = "A shade lunges from the trees! Choose an action."
@@ -587,10 +646,24 @@ func _start_battle() -> void:
 func _attack() -> void:
 	if not battle_active:
 		return
-	var damage := randi_range(17, 25)
+	var damage := randi_range(18, 25) + (player_level - 1) * 3
 	enemy_hp = maxi(enemy_hp - damage, 0)
-	battle_log.text = "You strike the shade for %d damage." % damage
+	_log_player_action("You attack for %d damage." % damage)
 	_update_battle_hud()
+	if enemy_hp == 0:
+		_finish_battle(true)
+	else:
+		_enemy_turn()
+
+func _cast_magic() -> void:
+	if not battle_active or player_mp < 8:
+		return
+	player_mp -= 8
+	var damage := 34 + (player_level - 1) * 4
+	enemy_hp = maxi(enemy_hp - damage, 0)
+	_log_player_action("You cast Ember for %d damage. (-8 MP)" % damage)
+	_update_battle_hud()
+	_update_hud()
 	if enemy_hp == 0:
 		_finish_battle(true)
 	else:
@@ -600,26 +673,40 @@ func _guard() -> void:
 	if not battle_active:
 		return
 	guarding = true
-	battle_log.text = "You brace yourself for the shade's attack."
+	_log_player_action("You guard. The next hit will be reduced.")
 	_enemy_turn()
 
 func _use_potion() -> void:
-	if not battle_active or potions <= 0 or player_hp >= PLAYER_MAX_HP:
+	if not battle_active or potions <= 0 or player_hp >= max_hp():
 		return
-	var restored := mini(35, PLAYER_MAX_HP - player_hp)
+	var restored := mini(35, max_hp() - player_hp)
 	player_hp += restored
 	potions -= 1
-	battle_log.text = "You use a potion and recover %d HP." % restored
+	_log_player_action("You use a potion and recover %d HP." % restored)
 	_update_battle_hud()
 	_enemy_turn()
 
+func _log_player_action(message: String) -> void:
+	battle_log.text = message
+	_update_battle_hud()
+
+func _flee() -> void:
+	if not battle_active:
+		return
+	battle_active = false
+	battle_fled = true
+	_set_battle_actions_visible(false)
+	battle_log.text = "You retreat from the shade. Your quest is still waiting."
+	battle_result_button.text = "Retreat to the village"
+	battle_result_button.show()
+
 func _enemy_turn() -> void:
-	var damage := randi_range(9, 15)
+	var damage := randi_range(10, 15) + (player_level - 1) * 2
 	if guarding:
-		damage = ceili(damage * 0.5)
+		damage = ceili(damage * 0.4)
 		guarding = false
 	player_hp = maxi(player_hp - damage, 0)
-	battle_log.text += "\nThe shade hits you for %d damage." % damage
+	battle_log.text += "\nThe shade attacks for %d damage." % damage
 	_update_battle_hud()
 	_update_hud()
 	if player_hp == 0:
@@ -630,11 +717,15 @@ func _finish_battle(victory: bool) -> void:
 	battle_won = victory
 	_set_battle_actions_visible(false)
 	if victory:
-		battle_log.text = "The shade dissolves into the forest light. The path is safe!"
+		battle_log.text = "The shade dissolves into the forest light!"
 		battle_result_button.text = "Return to the village"
+		var leveled_up := _award_experience(80)
+		battle_log.text += "\nYou earned 80 XP."
+		if leveled_up:
+			battle_log.text += " Level up! You are now level %d." % player_level
 	else:
-		battle_log.text = "You fall back from the clearing. Mira helps you recover."
-		battle_result_button.text = "Recover and try again"
+		battle_log.text = "You were defeated. Mira will help you recover."
+		battle_result_button.text = "Recover at the village"
 	battle_result_button.show()
 
 func _leave_battle() -> void:
@@ -642,13 +733,19 @@ func _leave_battle() -> void:
 	if battle_won:
 		quest_step = 2
 		gold += 75
-		var save_error := save_progress(progress_save_path)
-		if save_error != OK:
-			push_error("Could not save Greenvale progress: %s" % error_string(save_error))
-	else:
-		player_hp = PLAYER_MAX_HP
+	elif battle_fled:
 		encounter_started = false
+		player.position = Vector2(560, 448)
+	else:
+		player_hp = max_hp()
+		player_mp = max_mp()
+		encounter_started = false
+		player.position = Vector2(250, 448)
+	battle_fled = false
 	player.set("movement_enabled", true)
+	var save_error := save_progress(progress_save_path)
+	if save_error != OK:
+		push_error("Could not save Greenvale progress: %s" % error_string(save_error))
 	_update_hud()
 	if battle_won:
 		_show_completion_message()
@@ -675,14 +772,23 @@ func _update_hud() -> void:
 			objective_label.text = "Objective: Follow the eastern path and clear the forest clearing."
 		_:
 			objective_label.text = "Quest complete: The forest path is safe. Explore Greenvale!"
-	hp_bar.value = float(player_hp) / PLAYER_MAX_HP * 100.0
+	hp_bar.value = float(player_hp) / float(max_hp()) * 100.0
+	mp_bar.value = float(player_mp) / float(max_mp()) * 100.0
+	progression_label.text = "LV %d  ·  %d / %d XP" % [player_level, player_experience, experience_to_next_level()]
+	experience_bar.value = float(player_experience) / float(experience_to_next_level()) * 100.0
 	gold_label.text = "%d G" % gold
 	new_game_button.visible = quest_step >= 2
+	if battle_player_status != null:
+		battle_player_status.text = "YOU  ·  LV %d  ·  HP %d/%d  ·  MP %d/%d" % [
+			player_level, player_hp, max_hp(), player_mp, max_mp()
+		]
 
 func _update_battle_hud() -> void:
 	enemy_hp_bar.value = float(enemy_hp) / ENEMY_MAX_HP * 100.0
 	potion_button.text = "Potion (%d)" % potions
-	potion_button.disabled = potions <= 0 or player_hp >= PLAYER_MAX_HP
+	potion_button.disabled = potions <= 0 or player_hp >= max_hp()
+	magic_button.disabled = player_mp < 8
+	magic_button.text = "Magic (%d MP)" % 8 if player_mp >= 8 else "Magic (need MP)"
 
 func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -693,6 +799,9 @@ func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 		"quest_step": quest_step,
 		"gold": gold,
 		"player_hp": player_hp,
+		"player_mp": player_mp,
+		"player_level": player_level,
+		"player_experience": player_experience,
 		"potions": potions
 	}))
 	var write_error := file.get_error()
@@ -708,7 +817,11 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 		return false
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
 	file.close()
-	if not parsed is Dictionary or parsed.get("version") != SAVE_VERSION:
+	if not parsed is Dictionary:
+		push_error("Greenvale save is invalid.")
+		return false
+	var save_version: Variant = parsed.get("version")
+	if not _is_saved_integer(save_version) or int(save_version) < 1 or int(save_version) > SAVE_VERSION:
 		push_error("Greenvale save is invalid or uses an unsupported version.")
 		return false
 	if not _is_saved_integer(parsed.get("quest_step")) \
@@ -717,12 +830,45 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 		or not _is_saved_integer(parsed.get("potions")):
 		push_error("Greenvale save is missing valid progress values.")
 		return false
+	if int(save_version) >= 2 and (
+		not _is_saved_integer(parsed.get("player_mp")) \
+		or not _is_saved_integer(parsed.get("player_level")) \
+		or not _is_saved_integer(parsed.get("player_experience"))
+	):
+		push_error("Greenvale save is missing valid progression values.")
+		return false
 
 	quest_step = clampi(int(parsed["quest_step"]), 0, 2)
 	gold = maxi(int(parsed["gold"]), 0)
-	player_hp = clampi(int(parsed["player_hp"]), 1, PLAYER_MAX_HP)
+	player_level = clampi(int(parsed.get("player_level", 1)), 1, 99)
+	player_experience = maxi(int(parsed.get("player_experience", 0)), 0)
+	player_hp = clampi(int(parsed["player_hp"]), 1, max_hp())
+	player_mp = clampi(int(parsed.get("player_mp", STARTING_MP)), 0, max_mp())
 	potions = clampi(int(parsed["potions"]), 0, 99)
 	return true
+
+func experience_to_next_level() -> int:
+	return 60 + (player_level - 1) * 35
+
+func max_hp() -> int:
+	return PLAYER_MAX_HP + (player_level - 1) * 20
+
+func max_mp() -> int:
+	return STARTING_MP + (player_level - 1) * 6
+
+func _award_experience(amount: int) -> bool:
+	player_experience += amount
+	var leveled_up := false
+	while player_level < 99 and player_experience >= experience_to_next_level():
+		player_experience -= experience_to_next_level()
+		player_level += 1
+		player_hp = max_hp()
+		player_mp = max_mp()
+		leveled_up = true
+	if player_level == 99:
+		player_experience = mini(player_experience, experience_to_next_level() - 1)
+	_update_hud()
+	return leveled_up
 
 func _is_saved_integer(value: Variant) -> bool:
 	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
@@ -734,12 +880,16 @@ func _confirm_new_game() -> void:
 
 func _start_fresh_game() -> void:
 	quest_step = 0
-	player_hp = PLAYER_MAX_HP
+	player_level = 1
+	player_experience = 0
+	player_hp = max_hp()
+	player_mp = max_mp()
 	potions = 0
 	gold = 0
 	encounter_started = false
 	battle_active = false
 	battle_won = false
+	battle_fled = false
 	dialogue_active = false
 	dialogue_panel.hide()
 	battle_overlay.hide()
