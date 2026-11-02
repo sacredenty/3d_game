@@ -176,7 +176,31 @@ func _start_combat(is_boss: bool) -> void:
 		30 if is_boss else 12
 	)
 
-func _on_dungeon_battle_finished(_outcome: String, _hp: int, _mp: int, _potion_count: int, _experience: int, _gold: int, battle_scene: Node) -> void:
+func _on_dungeon_battle_finished(outcome: String, hp: int, mp: int, potion_count: int, experience: int, gold_reward: int, battle_scene: Node) -> void:
+	if outcome == "victory":
+		var file := FileAccess.open(return_save_path, FileAccess.READ)
+		if file != null:
+			var parsed = JSON.parse_string(file.get_as_text())
+			file.close()
+			if parsed is Dictionary:
+				parsed["player_hp"] = hp
+				parsed["player_mp"] = mp
+				parsed["potions"] = potion_count
+				parsed["gold"] = int(parsed.get("gold", 0)) + gold_reward
+				var level := int(parsed.get("player_level", 1))
+				var xp := int(parsed.get("player_experience", 0)) + experience
+				while level < 99 and xp >= 60 + (level - 1) * 35:
+					xp -= 60 + (level - 1) * 35
+					level += 1
+				if level >= 99:
+					level = 99
+					xp = mini(xp, 60 + (level - 1) * 35 - 1)
+				parsed["player_level"] = level
+				parsed["player_experience"] = xp
+				var out := FileAccess.open(return_save_path, FileAccess.WRITE)
+				if out != null:
+					out.store_string(JSON.stringify(parsed))
+					out.close()
 	if is_instance_valid(battle_scene):
 		battle_scene.queue_free()
 
