@@ -2,6 +2,8 @@ extends Control
 
 class_name BattleScene
 
+@export var return_scene_path: String = "res://scenes/main/main_scene.tscn"
+
 @onready var game_manager = get_node_or_null("/root/GameManager")
 @onready var combat_system = get_node_or_null("/root/CombatSystem")
 @onready var encounter_system = get_node_or_null("/root/EncounterSystem")
@@ -79,14 +81,14 @@ func _on_turn_changed(actor_name: String) -> void:
 
 func _on_battle_won() -> void:
 	print("Battle won!")
-	get_tree().change_scene_to_packed(preload("res://scenes/main/main_scene.tscn"))
+	get_tree().change_scene_to_file(return_scene_path)
 
 func _on_battle_lost() -> void:
 	print("Battle lost!")
-	get_tree().change_scene_to_packed(preload("res://scenes/main/main_scene.tscn"))
+	get_tree().change_scene_to_file(return_scene_path)
 
 func _on_battle_fled() -> void:
-	get_tree().change_scene_to_packed(preload("res://scenes/main/main_scene.tscn"))
+	get_tree().change_scene_to_file(return_scene_path)
 
 func update_ui() -> void:
 	if player_hp_container == null or enemy_hp_container == null:

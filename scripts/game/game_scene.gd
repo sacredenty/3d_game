@@ -211,7 +211,7 @@ var map_tab_button: Button
 var journal_tab_button: Button
 
 func _ready() -> void:
-	AudioDirector.play_greenvale_theme()
+	var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_greenvale_theme()
 	save_slot_prefix = progress_save_path.get_basename()
 	for slot_index in range(SAVE_SLOT_COUNT):
 		var slot_suffix := "_slot_%d" % (slot_index + 1)
@@ -665,14 +665,14 @@ func _build_interface() -> void:
 	_update_hud()
 
 func _toggle_audio() -> void:
-	AudioDirector.toggle_audio()
+	var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.toggle_audio()
 	for button in find_children("*", "Button", true, false):
 		if button.name == "AudioToggleButton":
 			_update_audio_toggle_button(button)
 
 func _update_audio_toggle_button(button: Button) -> void:
 	button.name = "AudioToggleButton"
-	button.text = "Audio: On" if AudioDirector.audio_enabled else "Audio: Off"
+	button.text = "Audio: On" if (get_node_or_null("/root/AudioDirector") and get_node_or_null("/root/AudioDirector").audio_enabled) else "Audio: Off"
 
 func _build_hero_creation() -> void:
 	creation_layer = CanvasLayer.new()
@@ -1700,7 +1700,7 @@ func _update_prompt() -> void:
 		prompt_label.text = "E  Claim the crystal heart"
 		prompt_panel.show()
 	elif not in_cave and _near_world_object(CAVE_ENTRANCE_POSITION):
-		prompt_label.text = "E  Enter the cave" if quest_step >= 5 else "The cave is sealed until Greenvale is safe."
+		prompt_label.text = "E  Enter the dungeon" if quest_step >= 5 else "The cave is sealed until Greenvale is safe."
 		prompt_panel.show()
 	elif quest_step == 1 and player.global_position.distance_to(CLEARING_POSITION) < 210.0:
 		prompt_label.text = "The shade's clearing is just ahead..."
@@ -1725,9 +1725,12 @@ func _interact_with_world() -> void:
 		player_mp = mini(player_mp + 4, max_mp())
 		_show_notice("The crystal heart settles into your pack. Spirit increased by 2.")
 	elif not in_cave and _near_world_object(CAVE_ENTRANCE_POSITION) and quest_step >= 5:
-		in_cave = true
-		player.global_position = CAVE_EXIT_POSITION
-		_show_notice("You enter the old cave. Something stirs in the darkness.")
+		save_progress(progress_save_path)
+		var dungeon_scene := preload("res://scenes/dungeons/dungeon_scene.tscn").instantiate()
+		dungeon_scene.set("return_save_path", progress_save_path)
+		get_tree().root.add_child(dungeon_scene)
+		get_tree().current_scene = dungeon_scene
+		queue_free()
 	elif quest_step == 1 and not northern_tracks_found and _near_world_object(NORTHERN_TRACKS_POSITION):
 		northern_tracks_found = true
 		_sync_exploration_markers()
@@ -1947,7 +1950,7 @@ func _on_battle_finished(
 	player_hp = hp
 	player_mp = mp
 	potions = potion_count
-	AudioDirector.play_greenvale_theme()
+	var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_greenvale_theme()
 	battle_active = false
 	player.set("movement_enabled", true)
 	if outcome == "victory":

@@ -112,7 +112,9 @@ func start_battle(
 	active = true
 	battle_outcome = ""
 	enemy_art.texture = _make_enemy_texture(enemy_color, enemy_name)
-	AudioDirector.play_battle_theme()
+	var audio_director = get_node_or_null("/root/AudioDirector")
+	if audio_director != null:
+		audio_director.play_battle_theme()
 	battle_title.text = "CAVE ENCOUNTER" if enemy_name == "Cave Sentinel" else "FOREST ENCOUNTER"
 	_update_ui()
 	battle_log.text = "Choose an action. Watch the enemy's intent."
@@ -281,7 +283,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _attack() -> void:
 	if not active:
 		return
-	AudioDirector.play_effect("attack")
+	var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_effect("attack")
 	var damage := randi_range(18, 25) + (hero_strength - 10) * 2 \
 		+ (player_level - 1) * 3 + weapon_attack_bonus
 	if hero_class == "Warrior":
@@ -294,7 +296,7 @@ func _attack() -> void:
 func _cast_magic() -> void:
 	if not active or player_mp < 8:
 		return
-	AudioDirector.play_effect("magic")
+	var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_effect("magic")
 	player_mp -= 8
 	var damage := 18 + hero_spirit * 2 + (player_level - 1) * 4 + weapon_magic_bonus
 	if hero_class == "Mage":
@@ -306,7 +308,7 @@ func _cast_magic() -> void:
 func _guard() -> void:
 	if not active:
 		return
-	AudioDirector.play_effect("hit")
+	var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_effect("hit")
 	guarding = true
 	_action_message("You guard against the next attack.")
 	_after_player_action()
@@ -315,7 +317,7 @@ func _use_potion() -> void:
 	var maximum_hp := 48 + hero_vitality * 4 + (player_level - 1) * 20
 	if not active or potions <= 0 or player_hp >= maximum_hp:
 		return
-	AudioDirector.play_effect("potion")
+	var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_effect("potion")
 	var restored := mini(35, maximum_hp - player_hp)
 	player_hp += restored
 	potions -= 1
@@ -325,7 +327,7 @@ func _use_potion() -> void:
 func _flee() -> void:
 	if not active:
 		return
-	AudioDirector.play_effect("hit")
+	var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_effect("hit")
 	active = false
 	battle_outcome = "flee"
 	actions.hide()
@@ -375,7 +377,7 @@ func _enemy_turn(foe_index: int) -> void:
 		battle_log.text += "\n%s uses %s, but you evade it!" % [foe_name, intent.to_lower()]
 	else:
 		player_hp = maxi(player_hp - damage, 0)
-		AudioDirector.play_effect("hit")
+		var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_effect("hit")
 		battle_log.text += "\n%s uses %s for %d damage." % [foe_name, intent.to_lower(), damage]
 		if intent == "Cinder bolt":
 			var drained_mp := mini(player_mp, 4)
@@ -388,7 +390,7 @@ func _finish(outcome: String) -> void:
 	active = false
 	battle_outcome = outcome
 	if outcome == "victory":
-		AudioDirector.play_effect("victory")
+		var _ad=get_node_or_null("/root/AudioDirector"); if _ad: _ad.play_effect("victory")
 	actions.hide()
 	match outcome:
 		"victory":
