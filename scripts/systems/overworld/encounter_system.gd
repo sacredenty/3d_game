@@ -113,7 +113,6 @@ func setup_enemy(name: String, enemy: Enemy) -> void:
 			enemy.attack_power = 18.0
 			enemy.defense = 10.0
 			enemy.magic_power = 20.0
-	enemy.current_defense = enemy.defense
 
 func get_encounter_data() -> Array[Dictionary]:
 	var enemy_names = ["slime", "rat", "wolf", "goblin", "bat", "orc"]

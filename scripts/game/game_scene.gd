@@ -203,6 +203,7 @@ var inventory_status: Label
 var inventory_slots_list: VBoxContainer
 var inventory_bag_list: VBoxContainer
 var map_journal_layer: CanvasLayer
+var world_map_instance: Node = null  # World Map instance for zone navigation
 var map_canvas: ExplorationMap
 var map_page: Control
 var journal_page: Control
@@ -1131,12 +1132,70 @@ func _open_map_journal() -> void:
 	map_canvas.queue_redraw()
 	_show_map_page()
 	map_journal_layer.show()
+	
+	# Add world map button to journal page if not already present
+	if not _has_world_map_button():
+		var world_map_btn = _create_world_map_button()
+		journal_page.add_child(world_map_btn)
 
 func _close_map_journal() -> void:
 	map_journal_layer.hide()
 	if not creation_layer.visible and not battle_active and not dialogue_active \
 		and not save_load_layer.visible and not shop_layer.visible and not inventory_layer.visible:
 		player.set("movement_enabled", true)
+
+func _return_from_world_map() -> void:
+	# Remove world map from root
+	if world_map_instance != null:
+		world_map_instance.queue_free()
+		world_map_instance = null
+	
+	# Show the game again
+	map_journal_layer.show()
+	player.set("movement_enabled", false)
+
+func _on_world_map_zone_selected(zone_name: String) -> void:
+	var zone_manager = get_node_or_null("/root/ZoneManager")
+	if zone_manager != null:
+		zone_manager.change_zone(zone_name)
+
+func _has_world_map_button() -> bool:
+	for child in journal_page.get_children():
+		if child is Button and child.text == "🗺️ World Map":
+			return true
+	return false
+
+func _create_world_map_button() -> Button:
+	var btn = Button.new()
+	btn.name = "WorldMapButton"
+	btn.custom_minimum_size = Vector2(150, 40)
+	btn.text = "🗺️ World Map"
+	btn.position = Vector2(10, journal_page.size.y - 60)
+	btn.pressed.connect(_open_world_map)
+	return btn
+
+func _open_world_map() -> void:
+	# Hide the map/journal layer first
+	map_journal_layer.hide()
+	player.set("movement_enabled", true)
+	
+	# Show world map scene
+	var world_map_scene = preload("res://scenes/world_map.tscn")
+	if world_map_scene != null:
+		world_map_instance = world_map_scene.instantiate()
+		var world_map = world_map_instance
+		add_child(world_map, true)  # Add to root with ownership
+		
+		# Connect signals for returning to game
+		world_map.back_to_game_requested.connect(_return_from_world_map)
+		
+		# Set current zone from ZoneManager autoload
+		var zone_manager = get_node_or_null("/root/ZoneManager")
+		if zone_manager != null:
+			world_map.load_zone_data()
+		
+		# Apply zone changes when the world map emits one
+		world_map.zone_selected.connect(_on_world_map_zone_selected)
 
 func _show_map_page() -> void:
 	if map_page == null:
@@ -1636,6 +1695,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			and event.keycode in [KEY_M, KEY_ESCAPE]:
 			_close_map_journal()
 			get_viewport().set_input_as_handled()
+		elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_W:
+			# Toggle between map journal and world map
+			if _has_world_map_button():
+				_open_world_map()
+			else:
+				_open_map_journal()
+			get_viewport().set_input_as_handled()
 		return
 	if creation_layer.visible or save_load_layer.visible or shop_layer.visible or inventory_layer.visible:
 		return
@@ -1644,7 +1710,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
-		_open_map_journal()
+		# Toggle between world map and map journal
+		if world_map_instance != null:
+			_return_from_world_map()
+		else:
+			_open_map_journal()
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("interact") and not event.is_echo() and not battle_active:

@@ -1,0 +1,45 @@
+[gd_scene load_steps=2 format=3 uid="uid://zonetransition1"]
+
+[ext_resource type="Script" path="res://scripts/systems/ui/zone_transition.gd" id="1_script"]
+
+[node name="ZoneTransition" type="CanvasLayer"]
+script = ExtResource("1_script")
+
+[node name="BackgroundFade" type="ColorRect" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+size = Vector2(960, 600)
+color = Color(0, 0, 0, 0)
+
+[node name="LoadingIndicator" type="Label" parent="."]
+text = "Loading Zone..."
+horizontal_alignment = 1
+vertical_alignment = 1
+font_size = 32
+position = Vector2(480, 300)
+color = Color("fff0d0")
+
+[node name="ZoneNameDisplay" type="Label" parent="."]
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+font_size = 24
+position = Vector2(480, 350)
+color = Color("f5e6d3")
+
+[node name="ProgressContainer" type="ProgressBar" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+position = Vector2(480, 400)
+size = Vector2(400, 20)
+
+[node name="ProgressFill" type="ProgressBar" parent="ProgressContainer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color("6fb3c0")
