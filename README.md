@@ -2,6 +2,15 @@
 
 A solo-hero, turn-based JRPG prototype built with Godot 4, inspired by classic JRPG exploration and combat.
 
+## 3D Prototype Status
+
+- The default project start is a 3D adaptation of the Greenvale adventure: create a Warrior, Mage, or Rogue; talk to Mira and Rowan; follow the linked forest quests; and enter the cave after Greenvale is safe.
+- Hero creation uses class-specific randomized stats, shows derived HP/MP, and allows rerolling before starting.
+- Combat uses the original turn-based encounter system, including Ember magic, Guard, potions, enemy intents, weaknesses, mixed encounters, XP, and gold.
+- The 3D adventure includes equipment, buying and selling, a map/journal, clue interactions, campfire recovery, the optional Cave Sentinel, and three save slots with autosave.
+- Trees, houses, NPCs, and guardians have collision. The 3D presentation uses simple generated meshes; the existing 2D game and art remain available in their original scenes.
+- The original 2D JRPG scenes still exist in the repo and can be opened separately.
+
 ## Current Playable Slice
 
 - Explore a tile-based village and forest clearing with solid world boundaries, trees, and buildings
@@ -22,8 +31,8 @@ A solo-hero, turn-based JRPG prototype built with Godot 4, inspired by classic J
 ## How to Run
 
 1. Open Godot 4 in this directory
-2. Run the default title menu (`res://scenes/ui/main_menu.tscn`)
-3. Press F5 or run from the Play button
+2. Press F5 to open the title menu
+3. Choose **New Game**, select a class, and confirm **Begin Adventure**
 
 ## Title Menu
 
@@ -39,6 +48,15 @@ A solo-hero, turn-based JRPG prototype built with Godot 4, inspired by classic J
 - Use **Audio: On / Off** on the title menu or in-game controls to mute or restore all audio; the preference is saved between sessions.
 
 ## Controls
+
+### 3D Adventure
+- **WASD** or **Arrow Keys**: Move
+- **E**: Talk, trade, examine clues, collect items, rest, or enter/leave the cave
+- **H**: Use a potion while exploring
+- **1-5** (or click the battle buttons): Attack, Ember magic, Guard, Potion, Flee during turn-based battles. Battles begin when you reach the current enemy after investigating its clue.
+- **I**: Open the equipment bag
+- **M**: Open the map and quest journal
+- **Save Slot**: Save to one of three slots; progress also auto-saves. Use **Load Game** from the title menu to load a slot.
 
 ### Greenvale Adventure
 - **WASD** or **Arrow Keys**: Move

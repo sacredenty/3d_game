@@ -2,8 +2,8 @@ extends Control
 
 signal new_game_started()
 
-const GAME_SCENE := preload("res://scenes/game.tscn")
-const AUTO_SAVE_PATH := "user://greenvale_progress.json"
+const GAME_SCENE := preload("res://scenes/3d_main.tscn")
+const AUTO_SAVE_PATH := "user://three_d_progress.json"
 const SAVE_SLOT_COUNT := 3
 
 var continue_button: Button

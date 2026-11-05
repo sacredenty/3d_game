@@ -265,7 +265,8 @@ func _make_button(text: String) -> Button:
 func _unhandled_input(event: InputEvent) -> void:
 	if not active or not event is InputEventKey or not event.pressed or event.echo:
 		return
-	match event.keycode:
+	var key: int = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+	match key:
 		KEY_1, KEY_A:
 			_attack()
 		KEY_2, KEY_M:

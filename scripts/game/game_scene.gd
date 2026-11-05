@@ -24,7 +24,7 @@ const CAVE_GUARDIAN_POSITION := Vector2(920.0, 800.0)
 const CAVE_TREASURE_POSITION := Vector2(840.0, 800.0)
 const PLAYER_MAX_HP := 100
 const PROGRESS_SAVE_PATH := "user://greenvale_progress.json"
-const SAVE_VERSION := 10
+const SAVE_VERSION := 11
 const SAVE_SLOT_COUNT := 3
 const STARTING_MP := 30
 const DEFAULT_HERO_NAME := "Adventurer"
@@ -204,6 +204,7 @@ var inventory_slots_list: VBoxContainer
 var inventory_bag_list: VBoxContainer
 var map_journal_layer: CanvasLayer
 var world_map_instance: Node = null  # World Map instance for zone navigation
+var current_zone: String = "village"
 var map_canvas: ExplorationMap
 var map_page: Control
 var journal_page: Control
@@ -240,6 +241,10 @@ func _ready() -> void:
 			else:
 				_begin_hero_creation()
 	_sync_exploration_markers()
+	var zone_manager = get_node_or_null("/root/ZoneManager")
+	if zone_manager != null and not zone_manager.zone_changed.is_connected(_on_zone_changed):
+		zone_manager.zone_changed.connect(_on_zone_changed)
+	_apply_zone_visuals()
 	_update_hud()
 
 func _build_world() -> void:
@@ -1136,7 +1141,7 @@ func _open_map_journal() -> void:
 	# Add world map button to journal page if not already present
 	if not _has_world_map_button():
 		var world_map_btn = _create_world_map_button()
-		journal_page.add_child(world_map_btn)
+		map_page.add_child(world_map_btn)
 
 func _close_map_journal() -> void:
 	map_journal_layer.hide()
@@ -1159,6 +1164,24 @@ func _on_world_map_zone_selected(zone_name: String) -> void:
 	if zone_manager != null:
 		zone_manager.change_zone(zone_name)
 
+func _apply_zone_visuals() -> void:
+	if world_tiles == null:
+		return
+	match current_zone:
+		"forest":
+			world_tiles.modulate = Color(0.75, 0.85, 0.75, 1)
+		"cave":
+			world_tiles.modulate = Color(0.7, 0.75, 0.9, 1)
+		"castle":
+			world_tiles.modulate = Color(0.8, 0.78, 0.82, 1)
+		_:
+			world_tiles.modulate = Color(1, 1, 1, 1)
+
+func _on_zone_changed(zone_name: String) -> void:
+	current_zone = zone_name
+	_apply_zone_visuals()
+	save_progress(progress_save_path)
+
 func _has_world_map_button() -> bool:
 	for child in journal_page.get_children():
 		if child is Button and child.text == "🗺️ World Map":
@@ -1168,9 +1191,18 @@ func _has_world_map_button() -> bool:
 func _create_world_map_button() -> Button:
 	var btn = Button.new()
 	btn.name = "WorldMapButton"
-	btn.custom_minimum_size = Vector2(150, 40)
+	btn.custom_minimum_size = Vector2(180, 48)
 	btn.text = "🗺️ World Map"
-	btn.position = Vector2(10, journal_page.size.y - 60)
+	btn.tooltip_text = "Open the zone map"
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("2f6f5f")
+	style.set_corner_radius_all(8)
+	btn.add_theme_stylebox_override("normal", style)
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = Color("3a8a76")
+	hover.set_corner_radius_all(8)
+	btn.add_theme_stylebox_override("hover", hover)
 	btn.pressed.connect(_open_world_map)
 	return btn
 
@@ -1180,7 +1212,7 @@ func _open_world_map() -> void:
 	player.set("movement_enabled", true)
 	
 	# Show world map scene
-	var world_map_scene = preload("res://scenes/world_map.tscn")
+	var world_map_scene = load("res://scenes/world_map.tscn")
 	if world_map_scene != null:
 		world_map_instance = world_map_scene.instantiate()
 		var world_map = world_map_instance
@@ -2131,6 +2163,7 @@ func save_progress(path: String = PROGRESS_SAVE_PATH) -> Error:
 		"southern_tracks_found": southern_tracks_found,
 		"hunter_contract_stage": hunter_contract_stage,
 		"in_cave": in_cave,
+		"current_zone": current_zone,
 		"cave_guardian_defeated": cave_guardian_defeated,
 		"cave_treasure_claimed": cave_treasure_claimed
 	}))
@@ -2206,14 +2239,8 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	if int(save_version) >= 8 and not _is_valid_saved_equipment(parsed, int(save_version)):
 		push_error("Greenvale save is missing valid equipment values.")
 		return false
-	if int(save_version) >= 10 and (
-		typeof(parsed.get("northern_tracks_found")) != TYPE_BOOL \
-		or typeof(parsed.get("southern_tracks_found")) != TYPE_BOOL \
-		or not _is_saved_integer(parsed.get("hunter_contract_stage")) \
-		or int(parsed.get("hunter_contract_stage", -1)) < 0 \
-		or int(parsed.get("hunter_contract_stage", -1)) > 6
-	):
-		push_error("Greenvale save is missing valid quest evidence.")
+	if int(save_version) >= 11 and not ["village", "forest", "cave", "castle"].has(str(parsed.get("current_zone", ""))):
+		push_error("Greenvale save is missing a valid zone.")
 		return false
 
 	quest_step = clampi(int(parsed["quest_step"]), 0, 5)
@@ -2255,6 +2282,7 @@ func load_progress(path: String = PROGRESS_SAVE_PATH) -> bool:
 	southern_tracks_found = bool(parsed.get("southern_tracks_found", quest_step >= 4))
 	hunter_contract_stage = clampi(int(parsed.get("hunter_contract_stage", 0)), 0, 6)
 	in_cave = bool(parsed.get("in_cave", false))
+	current_zone = str(parsed.get("current_zone", "village"))
 	cave_guardian_defeated = bool(parsed.get("cave_guardian_defeated", false))
 	cave_treasure_claimed = bool(parsed.get("cave_treasure_claimed", false))
 	if int(save_version) >= 6:

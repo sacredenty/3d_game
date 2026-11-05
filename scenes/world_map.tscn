@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3 uid="uid://worldmap1"]
+
+[ext_resource type="Script" path="res://scripts/systems/ui/world_map.gd" id="1_script"]
+
+[node name="WorldMap" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_script")
+
+[node name="ZoneContainer" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 100.0
+offset_right = 300.0
+offset_bottom = 300.0
+
+[node name="VillageZone" type="Button" parent="ZoneContainer"]
+text = "Village"
+
+[node name="ForestZone" type="Button" parent="ZoneContainer"]
+text = "Forest"
+
+[node name="CaveZone" type="Button" parent="ZoneContainer"]
+text = "Cave"
+
+[node name="CastleZone" type="Button" parent="ZoneContainer"]
+text = "Castle"
+
+[node name="InfoPanel" type="Panel" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 400.0
+offset_top = 100.0
+offset_right = 800.0
+offset_bottom = 300.0
+
+[node name="ZoneDescription" type="Label" parent="InfoPanel"]
+text = "Select a zone"
+
+[node name="CurrentZoneLabel" type="Label" parent="InfoPanel"]
+text = "Current Zone"
+
+[node name="BackButton" type="Button" parent="."]
+text = "Back"
